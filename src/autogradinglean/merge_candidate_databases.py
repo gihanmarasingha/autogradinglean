@@ -1,6 +1,6 @@
 import pandas as pd
 
-def merge_student_data(classroom_roster, sits_candidate_file):
+def merge_student_data(classroom_roster, sits_candidate_file, output_csv_path):
     """Merges candidate data from a GitHub Classroom classroom roster CSV file and a XLSX file
     extracted from SITS.
     
@@ -34,8 +34,7 @@ def merge_student_data(classroom_roster, sits_candidate_file):
     #df_merged['discrepancy'] = df_merged.apply(lambda row: pd.isna(row['identifier']) or pd.isna(row['candidate number']), axis=1)
 
     # Save the merged DataFrame to a new CSV file
-    return(df_merged)
-    #df_merged.to_csv(output_csv_path, index=False)
+    df_merged.to_csv(output_csv_path, index=False)
 
 # Example usage
 # merge_student_data('github_classroom_roster.csv', 'university_records.csv', 'merged_student_data.csv')
