@@ -3,6 +3,8 @@ import subprocess
 import json
 import re
 import os
+import toml
+from pathlib import Path
 
 # This module performs all the interaction with GitHub, largely via the GitHub API.
 # Here is documenation on querying classrooms via the API:
@@ -38,19 +40,42 @@ class GitHubClassroomBase:
 
 
 class GitHubClassroom(GitHubClassroomBase):
-    def __init__(self, classroom_id, classroom_roster_csv, sits_candidate_file, marking_root_dir):
-        self.id = classroom_id
-        self.df_classroom_roster = pd.read_csv(classroom_roster_csv, dtype=object)
-        self.df_sits_candidates = pd.read_csv(sits_candidate_file, dtype=object)
-        self.df_sits_candidates['Candidate No'] = self.df_sits_candidates['Candidate No'].astype(int).astype(str).apply(lambda x: x.zfill(6))
+    def __init__(self, marking_root_dir):
+        self.marking_root_dir = Path(marking_root_dir).expanduser()
+        # Check if marking_root_dir exists
+        if not self.marking_root_dir.exists():
+            raise FileNotFoundError(f"The specified marking_root_dir '{self.marking_root_dir}' does not exist.")
+
+        # Load configuration from TOML file
+        config_file_path = self.marking_root_dir / 'config.toml'
+        config = self.load_config_from_toml(config_file_path)
+        
+        if config is None:
+            raise Exception("Failed to load configuration. Initialization aborted.")
+        
+        self.id = config['classroom_id']
+        
+        # Make paths in TOML relative to marking_root_dir
+        self.classroom_roster_csv = self.marking_root_dir / config['classroom_roster_csv']
+        self.sits_candidate_file = self.marking_root_dir / config['sits_candidate_file']
+
+        self.df_classroom_roster = pd.read_csv(self.classroom_roster_csv, dtype=object)
+        self.df_sits_candidates = pd.read_csv(self.sits_candidate_file, dtype=object)
+        self.df_sits_candidates['Candidate No'] = self.df_sits_candidates['Candidate No'].astype(int).astype(str).apply(lambda x: x.zfill(6))     
         self.df_student_data = pd.DataFrame()
-        self.marking_root_dir = marking_root_dir
-        if not os.path.exists(self.marking_root_dir):
-            os.makedirs(self.marking_root_dir)  # Create the directory if it doesn't exist
         self.assignments = []  # List to hold GitHubAssignment objects
         self.df_assignments = self.fetch_assignments()  # Fetch assignments on initialization
         self.merge_student_data()
         self.initialize_assignments()  # Initialize GitHubAssignment objects
+
+    @staticmethod
+    def load_config_from_toml(config_file_path):
+        try:
+            config = toml.load(config_file_path)
+            return config
+        except Exception as e:
+            print(f"Failed to load configuration from {config_file_path}: {e}")
+            return None
 
     def fetch_assignments(self):
         command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{self.id}/assignments'        
@@ -103,9 +128,9 @@ class GitHubAssignment(GitHubClassroomBase):
     def __init__(self, assignment_id, parent_classroom):
         self.id = assignment_id
         self.parent_classroom = parent_classroom  # Reference to the parent GitHubClassroom object
-        self.assignment_dir = os.path.join(self.parent_classroom.marking_root_dir, f"assignment{self.id}")
-        if not os.path.exists(self.assignment_dir):
-            os.makedirs(self.assignment_dir)  # Create the directory if it doesn't exist
+        self.assignment_dir = self.parent_classroom.marking_root_dir / f"assignment{self.id}"
+        if not self.assignment_dir.exists():
+            self.assignment_dir.mkdir(parents=True)  # Create the directory if it doesn't exist
         self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         # Initialize other attributes related to the assignment
 
