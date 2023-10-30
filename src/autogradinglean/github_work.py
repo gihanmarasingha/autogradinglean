@@ -169,6 +169,22 @@ class GitHubAssignment(GitHubClassroomBase):
         else:
             print("Successfully cloned or pulled starter repository.")
 
+    def get_starter_repo_mathlib(self):
+        starter_repo_path = Path(self.assignment_dir) / "starter_repo"
+        
+        if starter_repo_path.exists():
+            # If the starter repo directory exists, run leanproject get-mathlib-cache
+            command = f"cd {starter_repo_path} && leanproject get-mathlib-cache"
+            
+            result = self.run_gh_command(command)
+            
+            if result is None:
+                print("Failed to get mathlib cache for starter repository.")
+            else:
+                print("Successfully got mathlib cache for starter repository.")
+        else:
+            print("Starter repository does not exist. Please clone it first.")
+            
     def clone_or_pull_student_repos(self):
         # Logic to clone or pull student repos
         pass
