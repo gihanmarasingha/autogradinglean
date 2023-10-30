@@ -143,9 +143,10 @@ class GitHubAssignment(GitHubClassroomBase):
         
         try:
             assignment_data = json.loads(cleaned_output)
+            self.assignment_data = assignment_data
             self.title = assignment_data.get('title')
             self.type = assignment_data.get('type')
-            self.starter_code_repository = assignment_data.get('stater_code_repository', {}).get('full_name')
+            self.starter_code_repository = assignment_data.get('starter_code_repository', {}).get('full_name')
             self.deadline = assignment_data.get('deadline')
         except json.JSONDecodeError as e:
             print(f"Failed to decode JSON: {e}")
