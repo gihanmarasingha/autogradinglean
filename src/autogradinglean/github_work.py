@@ -132,7 +132,24 @@ class GitHubAssignment(GitHubClassroomBase):
         if not self.assignment_dir.exists():
             self.assignment_dir.mkdir(parents=True)  # Create the directory if it doesn't exist
         self.df_grades = pd.DataFrame()  # DataFrame to hold grades
+        self.fetch_assignment_info()  # Fetch assignment info during initialization
+
         # Initialize other attributes related to the assignment
+
+    def fetch_assignment_info(self):
+        command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}'
+        raw_output = self.run_gh_command(command)
+        cleaned_output = self.remove_ansi_codes(raw_output)
+        
+        try:
+            assignment_data = json.loads(cleaned_output)
+            self.title = assignment_data.get('title')
+            self.type = assignment_data.get('type')
+            self.starter_code_repository = assignment_data.get('stater_code_repository', {}).get('full_name')
+            self.deadline = assignment_data.get('deadline')
+        except json.JSONDecodeError as e:
+            print(f"Failed to decode JSON: {e}")
+            return None
 
     def clone_or_pull_starter_repo(self):
         # Logic to clone or pull the starter repo
