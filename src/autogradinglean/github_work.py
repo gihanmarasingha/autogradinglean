@@ -152,9 +152,22 @@ class GitHubAssignment(GitHubClassroomBase):
             print(f"Failed to decode JSON: {e}")
             return None
 
-    def clone_or_pull_starter_repo(self):
-        # Logic to clone or pull the starter repo
-        pass
+    def get_starter_repo(self):
+        starter_repo_path = Path(self.assignment_dir) / "starter_repo"
+        
+        if starter_repo_path.exists():
+            # If the starter repo directory exists, pull the latest changes
+            command = f"cd {starter_repo_path} && git pull"
+        else:
+            # Otherwise, clone the starter repo
+            command = f"gh repo clone {self.starter_code_repository} {starter_repo_path}"
+        
+        result = self.run_gh_command(command)
+        
+        if result is None:
+            print("Failed to get starter repository.")
+        else:
+            print("Successfully cloned or pulled starter repository.")
 
     def clone_or_pull_student_repos(self):
         # Logic to clone or pull student repos
