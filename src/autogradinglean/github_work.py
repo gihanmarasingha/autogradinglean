@@ -5,6 +5,7 @@ import re
 import toml
 from pathlib import Path
 import os
+from tqdm import tqdm # for a progress bar
 
 ###################################
 #
@@ -128,6 +129,11 @@ class GitHubClassroom(GitHubClassroomBase):
         df_sits_candidates = self.df_sits_candidates
 
         self.df_student_data = pd.merge(df_classroom_roster, df_sits_candidates, left_on='identifier', right_on='Candidate No', how='outer')
+
+        file_path = self.marking_root_dir / 'student_data.csv'
+
+        # Save the DataFrame to a CSV file
+        self.df_student_data.to_csv(file_path, index=False)        
         
     def update_classroom_roster(self, new_classroom_roster_csv):
         self.df_classroom_roster = pd.read_csv(new_classroom_roster_csv, dtype=object)
@@ -159,7 +165,8 @@ class GitHubAssignment(GitHubClassroomBase):
         
         try:
             assignment_data = json.loads(output)
-            self.assignment_data = assignment_data
+            self.slug= assignment_data.get('slug')
+            self.accepted = assignment_data.get('accepted') # the number of accepted submissions
             self.title = assignment_data.get('title')
             self.type = assignment_data.get('type')
             self.starter_code_repository = assignment_data.get('starter_code_repository', {}).get('full_name')
@@ -200,22 +207,24 @@ class GitHubAssignment(GitHubClassroomBase):
                 print("Successfully got mathlib cache for starter repository.")
         else:
             print("Starter repository does not exist. Please clone it first.")
-            
+
+
     def get_student_repos(self):
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
 
-        commit_count_file = Path(self.assignment_dir) / "commit_counts.json"
-        old_commit_counts = {}
+        commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
 
-        # Load old commit counts if the file exists
-        if commit_count_file.exists():
-            with open(commit_count_file, 'r') as f:
-                old_commit_counts = json.load(f)
+        # Initialize DataFrame to store commit data
+        if commit_data_file.exists():
+            commit_data_df = pd.read_csv(commit_data_file)
+        else:
+            commit_data_df = pd.DataFrame(columns=['repo_full_name', 'login', 'commit_count'])
 
         page = 1
         per_page = 100  # max allowed value
 
+        pbar = tqdm(total=self.accepted, desc="Getting student repos")
         while True:
             # Fetch accepted assignments from GitHub API
             command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
@@ -229,13 +238,13 @@ class GitHubAssignment(GitHubClassroomBase):
                 for assignment in accepted_assignments:
                     repo_info = assignment.get('repository', {})
                     repo_full_name = repo_info.get('full_name', '')
-                    repo_url = repo_info.get('html_url', '')
+                    login = assignment['students'][0]['login']
                     new_commit_count = assignment.get('commit_count', 0)
 
-                    old_commit_count = old_commit_counts.get(repo_full_name, 0)
-                    if new_commit_count > old_commit_count:
+                    # Check if this repo is already in the DataFrame
+                    existing_row = commit_data_df.loc[commit_data_df['repo_full_name'] == repo_full_name]
+                    if existing_row.empty or existing_row.iloc[0]['commit_count'] < new_commit_count:
                         # Logic to clone or pull the repo
-                        # You can use repo_full_name and repo_url here
                         student_repo_path = student_repos_dir / repo_full_name.split('/')[-1]
                         if student_repo_path.exists():
                             # Pull the repo
@@ -243,11 +252,13 @@ class GitHubAssignment(GitHubClassroomBase):
                             self.run_command(pull_command)
                         else:
                             # Clone the repo
-                            clone_command = f"git clone {repo_url} {student_repo_path}"
+                            clone_command = f"git clone {repo_info.get('html_url', '')} {student_repo_path}"
                             self.run_command(clone_command)
 
-                        # Update commit count
-                        old_commit_counts[repo_full_name] = new_commit_count
+                        # Update or add the row in the DataFrame
+                        new_row = {'repo_full_name': repo_full_name, 'login': login, 'commit_count': new_commit_count}
+                        commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
+                    pbar.update(1)
 
                 page += 1  # increment to fetch the next page
 
@@ -255,43 +266,10 @@ class GitHubAssignment(GitHubClassroomBase):
                 print(f"Failed to decode JSON: {e}")
                 break
 
-        # Save updated commit counts
-        with open(commit_count_file, 'w') as f:
-            json.dump(old_commit_counts, f)
+        pbar.close()
 
-
-    def get_student_repo_data(self):
-        student_repos_dir = Path(self.assignment_dir) / "student_repos"
-        student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
-
-        student_repo_data_file = student_repos_dir / "student_repo_data.json"
-
-        page = 1
-        per_page = 100  # max allowed value
-
-        all_accepted_assignments = []  # Initialize an empty list to store all accepted assignments
-
-        while True:
-            # Fetch accepted assignments from GitHub API
-            command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
-            output = self.run_gh_command(command)
-
-            try:
-                accepted_assignments = json.loads(output)
-                if not accepted_assignments:
-                    break  # exit loop if no more assignments
-
-                all_accepted_assignments.extend(accepted_assignments)  # append accepted_assignments to the list
-
-                page += 1  # increment to fetch the next page
-
-            except json.JSONDecodeError as e:
-                print(f"Failed to decode JSON: {e}")
-                break
-
-        # Write out the JSON object of student repo data
-        with open(student_repo_data_file, 'w') as f:
-            json.dump(all_accepted_assignments, f, indent=4)
+        # Save updated commit data
+        commit_data_df.to_csv(commit_data_file, index=False)
 
 
     def create_symlinks(self):
@@ -311,7 +289,54 @@ class GitHubAssignment(GitHubClassroomBase):
 
     def run_autograding(self):
         # Logic to run autograding
-        pass
+        # Step 0: Load the existing grades DataFrame or create a new one
+        grades_file = Path(self.assignment_dir) / "grades.csv"
+        if grades_file.exists():
+            grades_df = pd.read_csv(grades_file)
+        else:
+            grades_df = pd.DataFrame(columns=['github_username', 'identifier', 'grade', 'manual_grade', 'commit_count', 'last_commit_date', 'last_commit_time', 'comment'])
+            grades_df.set_index('student_identifier', inplace=True)
+
+        # Load student repo data and commit counts
+        student_data = self.load_student_data()  # Assuming you have a method to load this
+        commit_counts = self.load_commit_counts()  # Assuming you have a method to load this
+
+        # Loop through each student repo
+        for student, data in student_data.items():
+            commit_count = data.get('commit_count', 0)
+
+            # Check if we should grade this repo
+            if student not in grades_df.index or commit_count > grades_df.loc[student, 'commit_count']:
+                # Step 1: Change directory
+                repo_path = Path(self.assignment_dir) / "student_repos" / student
+
+                # Step 2: Run the lean command
+                result = subprocess.run(f"cd {repo_path} && lean .evaluate/evaluate.lean", stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+
+                # Step 3: Check the output
+                if "sorry" not in result.stdout and "error" not in result.stdout:
+                    grade = 100
+                else:
+                    grade = 0
+
+                # Update the DataFrame
+                grades_df.loc[student] = {
+                    'github_username': data['github_username'],
+                    'grade': grade,
+                    'manual_grade_adjustment': None,  # Default value
+                    'commit_count': commit_count,
+                    'last_commit_time': data['last_commit_time'],  # Assuming you have this info
+                    'comment': ''  # Default value
+                }
+
+                # Copy over manual adjustments and comments if they exist
+                if student in grades_df.index:
+                    grades_df.loc[student, 'manual_grade_adjustment'] = grades_df.loc[student, 'manual_grade_adjustment']
+                    grades_df.loc[student, 'comment'] = grades_df.loc[student, 'comment']
+
+        # Save the updated DataFrame
+        grades_df.to_csv(grades_file)
+
 
     def update_grades(self):
         # Logic to update the df_grades DataFrame
@@ -322,7 +347,7 @@ class GitHubAssignment(GitHubClassroomBase):
         pass
 
     def autograde(self):
-        # High-level method to perform all autograding steps
+        # High-level method to perform all autograding stepss
         self.clone_or_pull_starter_repo()
         self.clone_or_pull_student_repos()
         self.create_symlinks()
