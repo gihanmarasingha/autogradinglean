@@ -189,6 +189,17 @@ class GitHubAssignment(GitHubClassroomBase):
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
 
+        commit_count_file = Path(self.assignment_dir) / "commit_counts.json"
+        old_commit_counts = {}
+
+        # Load old commit counts if the file exists
+        if commit_count_file.exists():
+            with open(commit_count_file, 'r') as f:
+                old_commit_counts = json.load(f)
+
+        student_repos_dir = Path(self.assignment_dir) / "student_repos"
+        student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
+
         page = 1
         per_page = 100  # max allowed value
 
@@ -207,24 +218,34 @@ class GitHubAssignment(GitHubClassroomBase):
                     repo_info = assignment.get('repository', {})
                     repo_full_name = repo_info.get('full_name', '')
                     repo_url = repo_info.get('html_url', '')
+                    new_commit_count = assignment.get('commit_count', 0)
 
-                    # Logic to clone or pull the repo
-                    # You can use repo_full_name and repo_url here
-                    student_repo_path = student_repos_dir / repo_full_name.split('/')[-1]
-                    if student_repo_path.exists():
-                        # Pull the repo
-                        pull_command = f"cd {student_repo_path} && git pull"
-                        self.run_gh_command(pull_command)
-                    else:
-                        # Clone the repo
-                        clone_command = f"git clone {repo_url} {student_repo_path}"
-                        self.run_gh_command(clone_command)
+                    old_commit_count = old_commit_counts.get(repo_full_name, 0)
+                    if new_commit_count > old_commit_count:
+                        # Logic to clone or pull the repo
+                        # You can use repo_full_name and repo_url here
+                        student_repo_path = student_repos_dir / repo_full_name.split('/')[-1]
+                        if student_repo_path.exists():
+                            # Pull the repo
+                            pull_command = f"cd {student_repo_path} && git pull"
+                            self.run_gh_command(pull_command)
+                        else:
+                            # Clone the repo
+                            clone_command = f"git clone {repo_url} {student_repo_path}"
+                            self.run_gh_command(clone_command)
+
+                        # Update commit count
+                        old_commit_counts[repo_full_name] = new_commit_count
 
                 page += 1  # increment to fetch the next page
 
             except json.JSONDecodeError as e:
                 print(f"Failed to decode JSON: {e}")
                 break
+
+        # Save updated commit counts
+        with open(commit_count_file, 'w') as f:
+            json.dump(old_commit_counts, f)
 
     def create_symlinks(self):
         # Logic to create symlinks from starter repo to student repos
