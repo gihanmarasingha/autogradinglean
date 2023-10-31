@@ -44,7 +44,7 @@ class GitHubClassroomBase:
     _ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
     @staticmethod
-    def run_gh_command(command):
+    def run_command(command):
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
@@ -52,9 +52,10 @@ class GitHubClassroomBase:
         return result.stdout
 
     @staticmethod
-    def remove_ansi_codes(text):
-        return GitHubClassroomBase._ansi_escape.sub('', text)
-
+    def run_gh_command(command):
+        raw_ouput = GitHubClassroomBase.run_command(command)
+        return GitHubClassroomBase._ansi_escape.sub('', raw_ouput)
+    
 
 class GitHubClassroom(GitHubClassroomBase):
     def __init__(self, marking_root_dir):
@@ -96,11 +97,10 @@ class GitHubClassroom(GitHubClassroomBase):
 
     def fetch_assignments(self):
         command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{self.id}/assignments'        
-        raw_output = self.run_gh_command(command)
-        cleaned_output = self.remove_ansi_codes(raw_output)
+        output = self.run_gh_command(command)
         
         try:
-            assignments_data = json.loads(cleaned_output)
+            assignments_data = json.loads(output)
             df_assignments = pd.DataFrame(assignments_data)
             return df_assignments
         except json.JSONDecodeError as e:
@@ -155,11 +155,10 @@ class GitHubAssignment(GitHubClassroomBase):
 
     def fetch_assignment_info(self):
         command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}'
-        raw_output = self.run_gh_command(command)
-        cleaned_output = self.remove_ansi_codes(raw_output)
+        output = self.run_gh_command(command)
         
         try:
-            assignment_data = json.loads(cleaned_output)
+            assignment_data = json.loads(output)
             self.assignment_data = assignment_data
             self.title = assignment_data.get('title')
             self.type = assignment_data.get('type')
@@ -193,7 +192,7 @@ class GitHubAssignment(GitHubClassroomBase):
             # If the starter repo directory exists, run leanproject get-mathlib-cache
             command = f"cd {starter_repo_path} && leanproject get-mathlib-cache"
             
-            result = self.run_gh_command(command)
+            result = self.run_command(command)
             
             if result is None:
                 print("Failed to get mathlib cache for starter repository.")
@@ -220,11 +219,10 @@ class GitHubAssignment(GitHubClassroomBase):
         while True:
             # Fetch accepted assignments from GitHub API
             command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
-            raw_output = self.run_gh_command(command)
-            cleaned_output = self.remove_ansi_codes(raw_output)
-
+            output = self.run_gh_command(command)
+            
             try:
-                accepted_assignments = json.loads(cleaned_output)
+                accepted_assignments = json.loads(output)
                 if not accepted_assignments:
                     break  # exit loop if no more assignments
 
@@ -276,11 +274,10 @@ class GitHubAssignment(GitHubClassroomBase):
         while True:
             # Fetch accepted assignments from GitHub API
             command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
-            raw_output = self.run_gh_command(command)
-            cleaned_output = self.remove_ansi_codes(raw_output)
+            output = self.run_gh_command(command)
 
             try:
-                accepted_assignments = json.loads(cleaned_output)
+                accepted_assignments = json.loads(output)
                 if not accepted_assignments:
                     break  # exit loop if no more assignments
 
@@ -333,10 +330,9 @@ class GitHubClassroomManager(GitHubClassroomBase):
 
     def fetch_classrooms(self):
         command = 'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms'
-        raw_output = self.run_gh_command(command)
-        cleaned_output = self.remove_ansi_codes(raw_output)
+        output = self.run_gh_command(command)
         try:
-            classrooms_data = json.loads(cleaned_output)
+            classrooms_data = json.loads(output)
             self.df_classrooms = pd.DataFrame(classrooms_data)
         except json.JSONDecodeError as e:
             print(f"Failed to decode JSON: {e}")
