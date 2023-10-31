@@ -41,6 +41,15 @@ from tqdm import tqdm # for a progress bar
 #   https://pygithub.readthedocs.io/en/stable/examples/Authentication.html#app-authentication
 
 
+# TODO: Add methods to
+# 1) create grade sheets that merge the output of the autograder with the SITS data
+# 2) create outputs for mail merge:
+# 2.1) Write to sits candidates with no corresponding github username (classroom level)
+# 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct (classroom level)
+# 2.3) Write to all candidates (with a linked roster) with their grades and comments (assignment level)
+# 2.4) Output all accepted users who have not selected a student ID (assignment level)
+
+
 class GitHubClassroomBase:
     _ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 
