@@ -9,7 +9,7 @@ from tqdm import tqdm # for a progress bar
 
 ###################################
 #
-#  TO DO, TO DO, TO DO, TO DO, TO DO, TO DO, 
+#  TODO, TODO, TODO, TODO, TODO, TODO, 
 # 
 #  Currently, I'm using the `accepted-assignments` API. This works pretty well
 #  but does not return submissions from people who didn't choose a student identifier
@@ -154,7 +154,7 @@ class GitHubAssignment(GitHubClassroomBase):
         self.assignment_dir = self.parent_classroom.marking_root_dir / f"assignment{self.id}"
         if not self.assignment_dir.exists():
             self.assignment_dir.mkdir(parents=True)  # Create the directory if it doesn't exist
-        self.df_grades = pd.DataFrame()  # DataFrame to hold grades
+        #self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
 
         # Initialize other attributes related to the assignment
@@ -219,7 +219,7 @@ class GitHubAssignment(GitHubClassroomBase):
         if commit_data_file.exists():
             commit_data_df = pd.read_csv(commit_data_file)
         else:
-            commit_data_df = pd.DataFrame(columns=['repo_full_name', 'login', 'commit_count'])
+            commit_data_df = pd.DataFrame(columns=['student_repo_name', 'login', 'commit_count', 'last_commit_date', 'last_commit_time'])
 
         page = 1
         per_page = 100  # max allowed value
@@ -235,17 +235,18 @@ class GitHubAssignment(GitHubClassroomBase):
                 if not accepted_assignments:
                     break  # exit loop if no more assignments
 
-                for assignment in accepted_assignments:
-                    repo_info = assignment.get('repository', {})
+                for submission in accepted_assignments:
+                    repo_info = submission.get('repository', {})
                     repo_full_name = repo_info.get('full_name', '')
-                    login = assignment['students'][0]['login']
-                    new_commit_count = assignment.get('commit_count', 0)
+                    student_repo_name = repo_full_name.split('/')[-1]
+                    student_repo_path = student_repos_dir / student_repo_name
+                    login = submission['students'][0]['login']
+                    new_commit_count = submission.get('commit_count', 0)
 
                     # Check if this repo is already in the DataFrame
-                    existing_row = commit_data_df.loc[commit_data_df['repo_full_name'] == repo_full_name]
+                    existing_row = commit_data_df.loc[commit_data_df['student_repo_name'] == student_repo_name]
                     if existing_row.empty or existing_row.iloc[0]['commit_count'] < new_commit_count:
                         # Logic to clone or pull the repo
-                        student_repo_path = student_repos_dir / repo_full_name.split('/')[-1]
                         if student_repo_path.exists():
                             # Pull the repo
                             pull_command = f"cd {student_repo_path} && git pull"
@@ -255,8 +256,18 @@ class GitHubAssignment(GitHubClassroomBase):
                             clone_command = f"git clone {repo_info.get('html_url', '')} {student_repo_path}"
                             self.run_command(clone_command)
 
-                        # Update or add the row in the DataFrame
-                        new_row = {'repo_full_name': repo_full_name, 'login': login, 'commit_count': new_commit_count}
+                        # TODO: think about how the following is affected by different time zones and locales.
+                        git_log_command = f"cd {student_repo_path} && git log -1 --format='%cd' --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
+                        git_log_result = self.run_command(git_log_command)
+
+                         # Update or add the row in the DataFrame
+                        new_row = {'student_repo_name': student_repo_name, 'login': login, 'commit_count': new_commit_count}
+
+                        if git_log_result:
+                            last_commit_date, last_commit_time = git_log_result.strip().split(',')
+                            new_row['last_commit_date'] = last_commit_date
+                            new_row['last_commit_time'] = last_commit_time
+
                         commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
                     pbar.update(1)
 
@@ -292,23 +303,30 @@ class GitHubAssignment(GitHubClassroomBase):
         # Step 0: Load the existing grades DataFrame or create a new one
         grades_file = Path(self.assignment_dir) / "grades.csv"
         if grades_file.exists():
-            grades_df = pd.read_csv(grades_file)
+            df_grades = pd.read_csv(grades_file)
         else:
-            grades_df = pd.DataFrame(columns=['github_username', 'identifier', 'grade', 'manual_grade', 'commit_count', 'last_commit_date', 'last_commit_time', 'comment'])
-            grades_df.set_index('student_identifier', inplace=True)
+            df_grades = pd.DataFrame(columns=['github_username', 'grade', 'commit_count', 'last_commit_date', 'last_commit_time', 'manual_grade', 'comment'])
+            #df_grades.set_index('student_identifier', inplace=True)
 
         # Load student repo data and commit counts
-        student_data = self.load_student_data()  # Assuming you have a method to load this
-        commit_counts = self.load_commit_counts()  # Assuming you have a method to load this
+        # ASSUMES WE HAVE RECENTLY RUN `get_student_repos`
+        commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
+        commit_data_df = pd.read_csv(commit_data_file)
 
+        pbar = tqdm(total=self.accepted, desc="Autograding student repos")
         # Loop through each student repo
-        for student, data in student_data.items():
-            commit_count = data.get('commit_count', 0)
+        for index, row in commit_data_df.iterrows():
+            commit_count = row.get('commit_count', 0)
+            login = row['login']
+            student_repo_name = row['student_repo_name']
+            # Check if this login exists in df_grades
+            existing_row = df_grades.loc[df_grades['github_username'] == login]
 
-            # Check if we should grade this repo
-            if student not in grades_df.index or commit_count > grades_df.loc[student, 'commit_count']:
-                # Step 1: Change directory
-                repo_path = Path(self.assignment_dir) / "student_repos" / student
+            # Check if we should proceed with grading
+            if existing_row.empty or existing_row.iloc[0]['commit_count'] < commit_count:
+                # Do some grading!
+                #print(f"Grading for {login} with commit_count {commit_count}")
+                repo_path = Path(self.assignment_dir) / "student_repos" / student_repo_name
 
                 # Step 2: Run the lean command
                 result = subprocess.run(f"cd {repo_path} && lean .evaluate/evaluate.lean", stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
@@ -320,22 +338,32 @@ class GitHubAssignment(GitHubClassroomBase):
                     grade = 0
 
                 # Update the DataFrame
-                grades_df.loc[student] = {
-                    'github_username': data['github_username'],
-                    'grade': grade,
-                    'manual_grade_adjustment': None,  # Default value
-                    'commit_count': commit_count,
-                    'last_commit_time': data['last_commit_time'],  # Assuming you have this info
-                    'comment': ''  # Default value
-                }
+                # TODO: think carefully about what happens if a student makes a commit after the deadline. There are several possibilities:
+                # 1) The student made no commit before the deadline. Then this counts as their only commit. The Hub can determine what mark should be awarded.
+                # 2) The student made a commit before the deadline *and* after the deadline.
+                #   The fairest resolution might be to start by grading the last submission before the deadline. If (on the advice of the Hub),
+                #   mitigation is given, then a chosen submission after the deadline should be marked.
+                #   If we go down this route, I'll have to think about how to represent the grades in the DataFrame.
+                last_commit_date = row.get('last_commit_date')
+                last_commit_time = row.get('last_commit_time')
 
-                # Copy over manual adjustments and comments if they exist
-                if student in grades_df.index:
-                    grades_df.loc[student, 'manual_grade_adjustment'] = grades_df.loc[student, 'manual_grade_adjustment']
-                    grades_df.loc[student, 'comment'] = grades_df.loc[student, 'comment']
+                new_row = {'github_username': login, 'grade': grade, 'commit_count': commit_count, 'last_commit_date': last_commit_date, 'last_commit_time': last_commit_time}
 
+                if existing_row.empty:
+                    # Append new row with default values for manual_grade and comment
+                    new_row['manual_grade'] = None
+                    new_row['comment'] = None
+                    df_grades = pd.concat([df_grades, pd.DataFrame([new_row])], ignore_index=True)
+                else:
+                    # Update existing row without modifying manual_grade and comment
+                    existing_index = existing_row.index[0]
+                    for key, value in new_row.items():
+                        df_grades.at[existing_index, key] = value
+            pbar.update(1)
+
+        pbar.close()
         # Save the updated DataFrame
-        grades_df.to_csv(grades_file)
+        df_grades.to_csv(grades_file, index=False)
 
 
     def update_grades(self):
