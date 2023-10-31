@@ -240,11 +240,11 @@ class GitHubAssignment(GitHubClassroomBase):
                         if student_repo_path.exists():
                             # Pull the repo
                             pull_command = f"cd {student_repo_path} && git pull"
-                            self.run_gh_command(pull_command)
+                            self.run_command(pull_command)
                         else:
                             # Clone the repo
                             clone_command = f"git clone {repo_url} {student_repo_path}"
-                            self.run_gh_command(clone_command)
+                            self.run_command(clone_command)
 
                         # Update commit count
                         old_commit_counts[repo_full_name] = new_commit_count
@@ -292,9 +292,6 @@ class GitHubAssignment(GitHubClassroomBase):
         # Write out the JSON object of student repo data
         with open(student_repo_data_file, 'w') as f:
             json.dump(all_accepted_assignments, f, indent=4)
-
-
-
 
 
     def create_symlinks(self):
