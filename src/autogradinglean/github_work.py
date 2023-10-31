@@ -185,9 +185,46 @@ class GitHubAssignment(GitHubClassroomBase):
         else:
             print("Starter repository does not exist. Please clone it first.")
             
-    def clone_or_pull_student_repos(self):
-        # Logic to clone or pull student repos
-        pass
+    def get_student_repos(self):
+        student_repos_dir = Path(self.assignment_dir) / "student_repos"
+        student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
+
+        page = 1
+        per_page = 100  # max allowed value
+
+        while True:
+            # Fetch accepted assignments from GitHub API
+            command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
+            raw_output = self.run_gh_command(command)
+            cleaned_output = self.remove_ansi_codes(raw_output)
+
+            try:
+                accepted_assignments = json.loads(cleaned_output)
+                if not accepted_assignments:
+                    break  # exit loop if no more assignments
+
+                for assignment in accepted_assignments:
+                    repo_info = assignment.get('repository', {})
+                    repo_full_name = repo_info.get('full_name', '')
+                    repo_url = repo_info.get('html_url', '')
+
+                    # Logic to clone or pull the repo
+                    # You can use repo_full_name and repo_url here
+                    student_repo_path = student_repos_dir / repo_full_name.split('/')[-1]
+                    if student_repo_path.exists():
+                        # Pull the repo
+                        pull_command = f"cd {student_repo_path} && git pull"
+                        self.run_gh_command(pull_command)
+                    else:
+                        # Clone the repo
+                        clone_command = f"git clone {repo_url} {student_repo_path}"
+                        self.run_gh_command(clone_command)
+
+                page += 1  # increment to fetch the next page
+
+            except json.JSONDecodeError as e:
+                print(f"Failed to decode JSON: {e}")
+                break
 
     def create_symlinks(self):
         # Logic to create symlinks from starter repo to student repos
