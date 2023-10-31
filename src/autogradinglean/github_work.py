@@ -197,9 +197,6 @@ class GitHubAssignment(GitHubClassroomBase):
             with open(commit_count_file, 'r') as f:
                 old_commit_counts = json.load(f)
 
-        student_repos_dir = Path(self.assignment_dir) / "student_repos"
-        student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
-
         page = 1
         per_page = 100  # max allowed value
 
@@ -246,6 +243,45 @@ class GitHubAssignment(GitHubClassroomBase):
         # Save updated commit counts
         with open(commit_count_file, 'w') as f:
             json.dump(old_commit_counts, f)
+
+
+    def get_student_repo_data(self):
+        student_repos_dir = Path(self.assignment_dir) / "student_repos"
+        student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
+
+        student_repo_data_file = student_repos_dir / "student_repo_data.json"
+
+        page = 1
+        per_page = 100  # max allowed value
+
+        all_accepted_assignments = []  # Initialize an empty list to store all accepted assignments
+
+        while True:
+            # Fetch accepted assignments from GitHub API
+            command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
+            raw_output = self.run_gh_command(command)
+            cleaned_output = self.remove_ansi_codes(raw_output)
+
+            try:
+                accepted_assignments = json.loads(cleaned_output)
+                if not accepted_assignments:
+                    break  # exit loop if no more assignments
+
+                all_accepted_assignments.extend(accepted_assignments)  # append accepted_assignments to the list
+
+                page += 1  # increment to fetch the next page
+
+            except json.JSONDecodeError as e:
+                print(f"Failed to decode JSON: {e}")
+                break
+
+        # Write out the JSON object of student repo data
+        with open(student_repo_data_file, 'w') as f:
+            json.dump(all_accepted_assignments, f, indent=4)
+
+
+
+
 
     def create_symlinks(self):
         # Logic to create symlinks from starter repo to student repos
