@@ -375,22 +375,23 @@ class GitHubAssignment(GitHubClassroomBase):
         df_grades.to_csv(grades_file, index=False)
 
 
-    def update_grades(self):
+    #def update_grades(self):
         # Logic to update the df_grades DataFrame
-        pass
+    #    pass
 
-    def save_grades_to_csv(self):
+    #def save_grades_to_csv(self):
         # Logic to save grades to a CSV file
-        pass
+    #    pass
 
     def autograde(self):
         # High-level method to perform all autograding stepss
-        self.clone_or_pull_starter_repo()
-        self.clone_or_pull_student_repos()
+        self.get_starter_repo()
+        self.get_starter_repo_mathlib()
+        self.get_student_repos()
         self.create_symlinks()
         self.run_autograding()
-        self.update_grades()
-        self.save_grades_to_csv()
+        #self.update_grades()
+        #self.save_grades_to_csv()
 
 
 class GitHubClassroomManager(GitHubClassroomBase):
