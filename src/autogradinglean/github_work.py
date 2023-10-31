@@ -2,9 +2,9 @@ import pandas as pd
 import subprocess
 import json
 import re
-import os
 import toml
 from pathlib import Path
+import os
 
 ###################################
 #
@@ -295,8 +295,19 @@ class GitHubAssignment(GitHubClassroomBase):
 
 
     def create_symlinks(self):
-        # Logic to create symlinks from starter repo to student repos
-        pass
+        student_repos_dir = Path(self.assignment_dir) / "student_repos"
+        starter_repo_dir = Path(self.assignment_dir) / "starter_repo"
+
+        for student_dir in student_repos_dir.iterdir():
+            if student_dir.is_dir():
+                target_link = student_dir / "_target"
+                leanpkg_link = student_dir / "leanpkg.path"
+
+                if not target_link.exists():
+                    os.symlink(starter_repo_dir / "_target", target_link)
+                
+                if not leanpkg_link.exists():
+                    os.symlink(starter_repo_dir / "leanpkg.path", leanpkg_link)
 
     def run_autograding(self):
         # Logic to run autograding
