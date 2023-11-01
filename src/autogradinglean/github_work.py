@@ -67,6 +67,28 @@ class GitHubClassroomBase:
         raw_ouput = GitHubClassroomBase.run_command(command)
         return GitHubClassroomBase._ansi_escape.sub('', raw_ouput)
     
+    def save_query_output(self, df_query_output, base_name, excel=False):
+        # Generate the current date and time in the format YYMMDDHHMMSS
+        current_time = datetime.now().strftime(r'%y%m%d%H%M%S')
+        
+        # Create the filename
+        if excel:
+            filename = f"{base_name}{current_time}.xlsx"
+        else:
+            filename = f"{base_name}{current_time}.csv"
+        
+        # Create the 'queries' subdirectory if it doesn't exist
+        self.queries_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Full path to the output file
+        file_path = self.queries_dir / filename
+        
+        # Save the DataFrame to Excel
+        if excel:
+            df_query_output.to_excel(file_path, index=False)
+        else:
+            df_query_output.to_csv(file_path, index=False)
+    
 
 class GitHubClassroom(GitHubClassroomBase):
     def __init__(self, marking_root_dir):
@@ -74,6 +96,8 @@ class GitHubClassroom(GitHubClassroomBase):
         # Check if marking_root_dir exists
         if not self.marking_root_dir.exists():
             raise FileNotFoundError(f"The specified marking_root_dir '{self.marking_root_dir}' does not exist.")
+
+        self.queries_dir = self.marking_root_dir / "query_output"
 
         # Load configuration from TOML file
         config_file_path = self.marking_root_dir / 'config.toml'
@@ -105,29 +129,6 @@ class GitHubClassroom(GitHubClassroomBase):
         except Exception as e:
             print(f"Failed to load configuration from {config_file_path}: {e}")
             return None
-        
-    def save_query_output(self, df_query_output, base_name, excel=False):
-        # Generate the current date and time in the format YYMMDDHHMMSS
-        current_time = datetime.now().strftime(r'%y%m%d%H%M%S')
-        
-        # Create the filename
-        if excel:
-            filename = f"{base_name}{current_time}.xlsx"
-        else:
-            filename = f"{base_name}{current_time}.csv"
-        
-        # Create the 'queries' subdirectory if it doesn't exist
-        queries_dir = self.marking_root_dir / "query_output"
-        queries_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Full path to the output file
-        file_path = queries_dir / filename
-        
-        # Save the DataFrame to Excel
-        if excel:
-            df_query_output.to_excel(file_path, index=False)
-        else:
-            df_query_output.to_csv(file_path, index=False)
 
     def fetch_assignments(self):
         command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{self.id}/assignments'        
@@ -211,6 +212,7 @@ class GitHubAssignment(GitHubClassroomBase):
         self.assignment_dir = self.parent_classroom.marking_root_dir / f"assignment{self.id}"
         if not self.assignment_dir.exists():
             self.assignment_dir.mkdir(parents=True)  # Create the directory if it doesn't exist
+        self.queries_dir = self.assignment_dir / "query_output"
         #self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
 
@@ -461,7 +463,7 @@ class GitHubAssignment(GitHubClassroomBase):
         filtered_commit_data_df = commit_data_df[commit_data_df['last_commit_author'] == 'github-classroom[bot]']
         df_no_commits = pd.merge(self.parent_classroom.df_student_data, filtered_commit_data_df, left_on='github_username', right_on='login', how='inner')
         df_no_commits = df_no_commits[['identifier', 'github_username', 'Forename', 'Surname', 'Email Address', 'student_repo_name']]
-        return(df_no_commits)
+        self.save_query_output(df_no_commits, 'no_commits', excel=True)
 
 
 class GitHubClassroomManager(GitHubClassroomBase):
