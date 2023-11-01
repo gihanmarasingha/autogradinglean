@@ -148,6 +148,7 @@ class GitHubClassroom(GitHubClassroomBase):
             return None
 
     def fetch_assignments(self):
+        self.logger.info('Fetching assignments from GitHub')
         command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{self.id}/assignments'        
         output = self.run_gh_command(command)
         
@@ -156,7 +157,7 @@ class GitHubClassroom(GitHubClassroomBase):
             df_assignments = pd.DataFrame(assignments_data)
             return df_assignments
         except json.JSONDecodeError as e:
-            print(f"Failed to decode JSON: {e}")
+            self.logger.error(f"Failed to decode JSON: {e}")
             return None
 
     def merge_student_data(self):
