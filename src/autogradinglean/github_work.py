@@ -426,6 +426,33 @@ class GitHubAssignment(GitHubClassroomBase):
         # Save the updated DataFrame
         df_grades.to_csv(grades_file, index=False)
 
+        # df_grades_filtered = df_grades[df_grades['last_commit_author'] != 'github-classroom[bot]'].copy()
+        # df_grades_filtered['final_grade'] = df_grades_filtered.apply(lambda row: row['manual_grade'] if pd.notna(row['manual_grade']) else row['grade'], axis=1)
+        # df_grades_filtered.drop(['grade', 'manual_grade'], axis=1, inplace=True)
+
+        # df_student_data_filtered = self.parent_classroom.df_student_data[~self.parent_classroom.df_student_data['Candidate No'].isna()]
+        # df_grades_out = pd.merge(df_student_data_filtered, df_grades_filtered, on='github_username', how='inner')
+
+
+        # Filter rows where 'last_commit_author' is not 'github-classroom[bot]'
+        condition = df_grades['last_commit_author'] != 'github-classroom[bot]'
+
+        # Update 'final_grade' based on the condition
+        df_grades.loc[condition, 'final_grade'] = df_grades.loc[condition].apply(
+            lambda row: row['manual_grade'] if pd.notna(row['manual_grade']) else row['grade'], axis=1
+        )
+
+        # Drop the original 'grade' and 'manual_grade' columns
+        df_grades.drop(['grade', 'manual_grade'], axis=1, inplace=True)
+
+        # Filter student data
+        df_student_data_filtered = self.parent_classroom.df_student_data[~self.parent_classroom.df_student_data['Candidate No'].isna()]
+        
+        # Merge the dataframes
+        df_grades_out = pd.merge(df_student_data_filtered, df_grades[condition], on='github_username', how='inner')
+        df_grades_out.drop(['github_id','name'], axis=1, inplace=True)
+
+        self.save_query_output(df_grades_out, 'grades', excel=True)
 
     #def update_grades(self):
         # Logic to update the df_grades DataFrame
