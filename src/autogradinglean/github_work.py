@@ -199,6 +199,7 @@ class GitHubClassroom(GitHubClassroomBase):
         adjust the classroom roster on GitHub and then update the local classroom roster."""
         # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
         unmatched_candidates = self.df_student_data[self.df_student_data['identifier'].isna()]
+        self.logger.info("Finding missing roster identifiers")
         return unmatched_candidates
     
     def find_missing_candidates(self):
@@ -214,6 +215,7 @@ class GitHubClassroom(GitHubClassroomBase):
         """Returns those candidates who have not linked their GitHub account with the roster"""
         unlinked_candidates = self.df_student_data.loc[pd.isna(self.df_student_data['github_username']) & ~pd.isna(self.df_student_data[self.student_id_col]), 
                      [self.student_id_col] + self.output_cols]
+        self.logger.info('Finding unlinked candidates')
         self.save_query_output(unlinked_candidates, 'unlinked_candidates', excel=True)
 
 
