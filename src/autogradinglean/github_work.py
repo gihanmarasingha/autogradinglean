@@ -10,7 +10,7 @@ from datetime import datetime
 
 ###################################
 #
-#  TODO, TODO, TODO, TODO, TODO, TODO, 
+#  TODO:
 # 
 #  Currently, I'm using the `accepted-assignments` API. This works pretty well
 #  but does not return submissions from people who didn't choose a student identifier
@@ -42,7 +42,7 @@ from datetime import datetime
 #   https://pygithub.readthedocs.io/en/stable/examples/Authentication.html#app-authentication
 
 
-# TODO: Add methods to
+# TODO: Document the methods that
 # 1) create grade sheets that merge the output of the autograder with the SITS data
 # 2) create outputs for mail merge:
 # 2.1) Write to sits candidates with no corresponding github username (classroom level)
