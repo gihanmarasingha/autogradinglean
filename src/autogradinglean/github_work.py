@@ -6,6 +6,7 @@ import toml
 from pathlib import Path
 import os
 from tqdm import tqdm # for a progress bar
+from datetime import datetime
 
 ###################################
 #
@@ -104,6 +105,29 @@ class GitHubClassroom(GitHubClassroomBase):
         except Exception as e:
             print(f"Failed to load configuration from {config_file_path}: {e}")
             return None
+        
+    def save_query_output(self, df_query_output, base_name, excel=False):
+        # Generate the current date and time in the format YYMMDDHHMMSS
+        current_time = datetime.now().strftime(r'%y%m%d%H%M%S')
+        
+        # Create the filename
+        if excel:
+            filename = f"{base_name}{current_time}.xlsx"
+        else:
+            filename = f"{base_name}{current_time}.csv"
+        
+        # Create the 'queries' subdirectory if it doesn't exist
+        queries_dir = self.marking_root_dir / "query_output"
+        queries_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Full path to the output file
+        file_path = queries_dir / filename
+        
+        # Save the DataFrame to Excel
+        if excel:
+            df_query_output.to_excel(file_path, index=False)
+        else:
+            df_query_output.to_csv(file_path, index=False)
 
     def fetch_assignments(self):
         command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{self.id}/assignments'        
@@ -172,6 +196,12 @@ class GitHubClassroom(GitHubClassroomBase):
         # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
         unmatched_candidates = self.df_student_data[self.df_student_data['Candidate No'].isna()]
         return unmatched_candidates
+    
+    def find_unlinked_candidates(self):
+        """Returns those candidates who have not linked their GitHub account with the roster"""
+        unlinked_candidates = self.df_student_data.loc[pd.isna(self.df_student_data['github_username']) & ~pd.isna(self.df_student_data['Candidate No']), 
+                     ['Candidate No', 'Forename', 'Surname', 'Email Address']]
+        self.save_query_output(unlinked_candidates, 'unliked_candidates', excel=True)
 
 
 class GitHubAssignment(GitHubClassroomBase):
