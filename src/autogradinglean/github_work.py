@@ -157,10 +157,20 @@ class GitHubClassroom(GitHubClassroomBase):
             self.assignments.append(new_assignment)
 
     def find_missing_roster_identifiers(self):
-        """Returns those students who appear in the SITS data but not in the classroom roster. The user
-          should manually adjust the classroom roster on GitHub and then update the local classroom roster."""
+        """Returns those students who appear in the SITS data but not in the classroom roster. This typically
+        indicates students who enrolled since the last update of the roster. The instructor should manually
+        adjust the classroom roster on GitHub and then update the local classroom roster."""
         # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
         unmatched_candidates = self.df_student_data[self.df_student_data['identifier'].isna()]
+        return unmatched_candidates
+    
+    def find_missing_candidates(self):
+        """Returns those students on the classroom roster who are not in the SITS data. This typically
+        indicates students who have unenrolled from the course. The instructor can either (1) manually update
+        the GitHub classroom roster to remove those identifers and then update the local classroom roster or
+        (2) just ignore the issue"""
+        # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
+        unmatched_candidates = self.df_student_data[self.df_student_data['Candidate No'].isna()]
         return unmatched_candidates
 
 
