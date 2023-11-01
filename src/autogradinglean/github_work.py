@@ -506,34 +506,3 @@ class GitHubClassroomManager(GitHubClassroomBase):
             self.df_classrooms = pd.DataFrame(classrooms_data)
         except json.JSONDecodeError as e:
             print(f"Failed to decode JSON: {e}")
-    
-    # def fetch_assignments(self, classroom_id=None, classroom_name=None):
-    #     if classroom_id:
-    #         command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{classroom_id}/assignments'
-    #     elif classroom_name:
-    #         classroom_row = self.df_classrooms[self.df_classrooms['name'] == classroom_name]
-    #         if not classroom_row.empty:
-    #             classroom_id = classroom_row.iloc[0]['id']
-    #             command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{classroom_id}/assignments'
-    #         else:
-    #             print(f"No classroom found with the name {classroom_name}")
-    #             return None
-    #     else:
-    #         print("Either classroom_id or classroom_name must be provided.")
-    #         return None
-        
-    #     raw_output = self.run_gh_command(command)
-    #     cleaned_output = self.remove_ansi_codes(raw_output)
-        
-    #     try:
-    #         assignments_data = json.loads(cleaned_output)
-    #         df_assignments = pd.DataFrame(assignments_data)
-            
-    #         # Create a GitHubClassroom object and populate it
-    #         classroom = GitHubClassroom(classroom_id, classroom_name)
-    #         classroom.df_assignments = df_assignments
-            
-    #         return classroom
-    #     except json.JSONDecodeError as e:
-    #         print(f"Failed to decode JSON: {e}")
-    #         return None
