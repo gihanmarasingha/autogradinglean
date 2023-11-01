@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 from tqdm import tqdm # for a progress bar
 from datetime import datetime
+import logging
 
 ###################################
 #
@@ -96,25 +97,41 @@ class GitHubClassroom(GitHubClassroomBase):
         # Check if marking_root_dir exists
         if not self.marking_root_dir.exists():
             raise FileNotFoundError(f"The specified marking_root_dir '{self.marking_root_dir}' does not exist.")
+        
+        self.logger = logging.getLogger(f'GitHubClassroom')
+        log_file = self.marking_root_dir / f"classroom.log"
+
+        logging.basicConfig(
+            filename=log_file,
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+
+        self.logger.info('Initaliazing classroom object')
 
         self.queries_dir = self.marking_root_dir / "query_output"
 
         # Load configuration from TOML file
+
+        self.logger.info('Reading config.toml file')
         config_file_path = self.marking_root_dir / 'config.toml'
         config = self.load_config_from_toml(config_file_path)
         
         if config is None:
-            raise Exception("Failed to load configuration. Initialization aborted.")
-        
+            raise Exception("Failed to load configuration. Initialization aborted.")  
         self.id = config['classroom_id']
         
         # Make paths in TOML relative to marking_root_dir
         self.classroom_roster_csv = self.marking_root_dir / config['classroom_roster_csv']
-        self.sits_candidate_file = self.marking_root_dir / config['sits_candidate_file']
+        self.sits_candidate_file = self.marking_root_dir / config['candidate_file']['filename']
 
         self.df_classroom_roster = pd.read_csv(self.classroom_roster_csv, dtype=object)
         self.df_sits_candidates = pd.read_csv(self.sits_candidate_file, dtype=object)
-        self.df_sits_candidates['Candidate No'] = self.df_sits_candidates['Candidate No'].astype(int).astype(str).apply(lambda x: x.zfill(6))     
+
+        self.student_id_col = config['candidate_file']['student_id_col']
+        self.output_cols = config['candidate_file']['output_cols']
+        self.df_sits_candidates[self.student_id_col] = self.df_sits_candidates[self.student_id_col].astype(int).astype(str).apply(lambda x: x.zfill(6))     
         self.df_student_data = pd.DataFrame()
         self.assignments = []  # List to hold GitHubAssignment objects
         self.df_assignments = self.fetch_assignments()  # Fetch assignments on initialization
@@ -145,24 +162,18 @@ class GitHubClassroom(GitHubClassroomBase):
     def merge_student_data(self):
         """Merges candidate data from a GitHub Classroom classroom roster CSV file and a CSV file
         extracted from SITS.
-        
-        The SITS data should contain the following columns:
-
-            'SPR code', 'Candidate No', 'Forename', 'Surname', 'Email Address'.
-
-        The 'Candidate No' is expected to be a string of 6 digits, padded left with zeros.
 
         The columns of the classroom roster should be:
 
             'identifier', 'github_username', 'github_id', 'name'
 
-        The 'identifier' should correspond with the 'Candidate No' from the SITS spreadsheet.
+        The 'identifier' should correspond with the student_id_col from the SITS spreadsheet.
         """
         # The classroom roster and SITS data are already stored in the object
         df_classroom_roster = self.df_classroom_roster
         df_sits_candidates = self.df_sits_candidates
 
-        self.df_student_data = pd.merge(df_classroom_roster, df_sits_candidates, left_on='identifier', right_on='Candidate No', how='outer')
+        self.df_student_data = pd.merge(df_classroom_roster, df_sits_candidates, left_on='identifier', right_on=self.student_id_col, how='outer')
 
         #file_path = self.marking_root_dir / 'student_data.csv'
 
@@ -195,13 +206,13 @@ class GitHubClassroom(GitHubClassroomBase):
         the GitHub classroom roster to remove those identifers and then update the local classroom roster or
         (2) just ignore the issue"""
         # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
-        unmatched_candidates = self.df_student_data[self.df_student_data['Candidate No'].isna()]
+        unmatched_candidates = self.df_student_data[self.df_student_data[self.student_id_col].isna()]
         return unmatched_candidates
     
     def find_unlinked_candidates(self):
         """Returns those candidates who have not linked their GitHub account with the roster"""
-        unlinked_candidates = self.df_student_data.loc[pd.isna(self.df_student_data['github_username']) & ~pd.isna(self.df_student_data['Candidate No']), 
-                     ['Candidate No', 'Forename', 'Surname', 'Email Address']]
+        unlinked_candidates = self.df_student_data.loc[pd.isna(self.df_student_data['github_username']) & ~pd.isna(self.df_student_data[self.student_id_col]), 
+                     [self.student_id_col] + self.output_cols]
         self.save_query_output(unlinked_candidates, 'unlinked_candidates', excel=True)
 
 
@@ -426,14 +437,6 @@ class GitHubAssignment(GitHubClassroomBase):
         # Save the updated DataFrame
         df_grades.to_csv(grades_file, index=False)
 
-        # df_grades_filtered = df_grades[df_grades['last_commit_author'] != 'github-classroom[bot]'].copy()
-        # df_grades_filtered['final_grade'] = df_grades_filtered.apply(lambda row: row['manual_grade'] if pd.notna(row['manual_grade']) else row['grade'], axis=1)
-        # df_grades_filtered.drop(['grade', 'manual_grade'], axis=1, inplace=True)
-
-        # df_student_data_filtered = self.parent_classroom.df_student_data[~self.parent_classroom.df_student_data['Candidate No'].isna()]
-        # df_grades_out = pd.merge(df_student_data_filtered, df_grades_filtered, on='github_username', how='inner')
-
-
         # Filter rows where 'last_commit_author' is not 'github-classroom[bot]'
         condition = df_grades['last_commit_author'] != 'github-classroom[bot]'
 
@@ -446,7 +449,7 @@ class GitHubAssignment(GitHubClassroomBase):
         df_grades.drop(['grade', 'manual_grade'], axis=1, inplace=True)
 
         # Filter student data
-        df_student_data_filtered = self.parent_classroom.df_student_data[~self.parent_classroom.df_student_data['Candidate No'].isna()]
+        df_student_data_filtered = self.parent_classroom.df_student_data[~self.parent_classroom.df_student_data[self.student_id_col].isna()]
         
         # Merge the dataframes
         df_grades_out = pd.merge(df_student_data_filtered, df_grades[condition], on='github_username', how='inner')
@@ -489,7 +492,7 @@ class GitHubAssignment(GitHubClassroomBase):
         commit_data_df = pd.read_csv(commit_data_file)
         filtered_commit_data_df = commit_data_df[commit_data_df['last_commit_author'] == 'github-classroom[bot]']
         df_no_commits = pd.merge(self.parent_classroom.df_student_data, filtered_commit_data_df, left_on='github_username', right_on='login', how='inner')
-        df_no_commits = df_no_commits[['identifier', 'github_username', 'Forename', 'Surname', 'Email Address', 'student_repo_name']]
+        df_no_commits = df_no_commits[['identifier', 'github_username'] + self.output_cols + ['student_repo_name']]
         self.save_query_output(df_no_commits, 'no_commits', excel=True)
 
 
