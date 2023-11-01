@@ -445,7 +445,23 @@ class GitHubAssignment(GitHubClassroomBase):
 
 
     def find_no_commit_candidates(self):
-        """Find the candidates who have not made a submission for this assignment"""
+        """Find the candidates who have not made a submission for this assignment. Though the natural
+        thing would be to test if 'commit_count' is zero, this doesn't always work (for reasons unbeknownst
+        to me). That is, sometimes a student will commit but the commit count will be zero. Perhaps this happens
+        if they push after the deadline.
+        
+        In any event, I will look for students where the last_commit_author is `github-classroom[bot]`.
+        
+        To ensure you have the latest data, run `get_student_repos()` before running this function.
+        """
+
+        commit_data_file = Path(self.assignment_dir) / "commit_data.csv" 
+        # TODO: error handing if the commit_data_file doesn't exist
+        commit_data_df = pd.read_csv(commit_data_file)
+        filtered_commit_data_df = commit_data_df[commit_data_df['last_commit_author'] == 'github-classroom[bot]']
+        df_no_commits = pd.merge(self.parent_classroom.df_student_data, filtered_commit_data_df, left_on='github_username', right_on='login', how='inner')
+        df_no_commits = df_no_commits[['identifier', 'github_username', 'Forename', 'Surname', 'Email Address', 'student_repo_name']]
+        return(df_no_commits)
 
 
 class GitHubClassroomManager(GitHubClassroomBase):
