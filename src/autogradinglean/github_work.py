@@ -139,10 +139,10 @@ class GitHubClassroom(GitHubClassroomBase):
 
         self.df_student_data = pd.merge(df_classroom_roster, df_sits_candidates, left_on='identifier', right_on='Candidate No', how='outer')
 
-        file_path = self.marking_root_dir / 'student_data.csv'
+        #file_path = self.marking_root_dir / 'student_data.csv'
 
         # Save the DataFrame to a CSV file
-        self.df_student_data.to_csv(file_path, index=False)        
+        #self.df_student_data.to_csv(file_path, index=False)        
         
     def update_classroom_roster(self, new_classroom_roster_csv):
         self.df_classroom_roster = pd.read_csv(new_classroom_roster_csv, dtype=object)
@@ -155,6 +155,14 @@ class GitHubClassroom(GitHubClassroomBase):
             assignment_id = row['id']
             new_assignment = GitHubAssignment(assignment_id, self)
             self.assignments.append(new_assignment)
+
+    def find_missing_roster_identifiers(self):
+        """Returns those students who appear in the SITS data but not in the classroom roster. The user
+          should manually adjust the classroom roster on GitHub and then update the local classroom roster."""
+        # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
+        unmatched_candidates = self.df_student_data[self.df_student_data['identifier'].isna()]
+        return unmatched_candidates
+
 
 class GitHubAssignment(GitHubClassroomBase):
     def __init__(self, assignment_id, parent_classroom):
