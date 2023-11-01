@@ -69,7 +69,7 @@ class GitHubClassroomBase:
     
     def save_query_output(self, df_query_output, base_name, excel=False):
         # Generate the current date and time in the format YYMMDDHHMMSS
-        current_time = datetime.now().strftime(r'%y%m%d%H%M%S')
+        current_time = datetime.now().strftime(r'%Y%m%d_%H%M_%S')
         
         # Create the filename
         if excel:
