@@ -201,7 +201,7 @@ class GitHubClassroom(GitHubClassroomBase):
         """Returns those candidates who have not linked their GitHub account with the roster"""
         unlinked_candidates = self.df_student_data.loc[pd.isna(self.df_student_data['github_username']) & ~pd.isna(self.df_student_data['Candidate No']), 
                      ['Candidate No', 'Forename', 'Surname', 'Email Address']]
-        self.save_query_output(unlinked_candidates, 'unliked_candidates', excel=True)
+        self.save_query_output(unlinked_candidates, 'unlinked_candidates', excel=True)
 
 
 class GitHubAssignment(GitHubClassroomBase):
