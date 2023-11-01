@@ -276,7 +276,7 @@ class GitHubAssignment(GitHubClassroomBase):
         if commit_data_file.exists():
             commit_data_df = pd.read_csv(commit_data_file)
         else:
-            commit_data_df = pd.DataFrame(columns=['student_repo_name', 'login', 'commit_count', 'last_commit_date', 'last_commit_time'])
+            commit_data_df = pd.DataFrame(columns=['student_repo_name', 'login', 'commit_count', 'last_commit_date', 'last_commit_time', 'last_commit_author'])
 
         page = 1
         per_page = 100  # max allowed value
@@ -314,16 +314,17 @@ class GitHubAssignment(GitHubClassroomBase):
                             self.run_command(clone_command)
 
                         # TODO: think about how the following is affected by different time zones and locales.
-                        git_log_command = f"cd {student_repo_path} && git log -1 --format='%cd' --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
+                        git_log_command = f"cd {student_repo_path} && git log -1 --format='%cd,%an' --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
                         git_log_result = self.run_command(git_log_command)
 
                          # Update or add the row in the DataFrame
                         new_row = {'student_repo_name': student_repo_name, 'login': login, 'commit_count': new_commit_count}
 
                         if git_log_result:
-                            last_commit_date, last_commit_time = git_log_result.strip().split(',')
+                            last_commit_date, last_commit_time, last_commit_author = git_log_result.strip().split(',')
                             new_row['last_commit_date'] = last_commit_date
                             new_row['last_commit_time'] = last_commit_time
+                            new_row['last_commit_author'] = last_commit_author
 
                         commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
                     pbar.update(1)
@@ -362,7 +363,7 @@ class GitHubAssignment(GitHubClassroomBase):
         if grades_file.exists():
             df_grades = pd.read_csv(grades_file)
         else:
-            df_grades = pd.DataFrame(columns=['github_username', 'grade', 'commit_count', 'last_commit_date', 'last_commit_time', 'manual_grade', 'comment'])
+            df_grades = pd.DataFrame(columns=['github_username', 'grade', 'commit_count', 'last_commit_date', 'last_commit_time', 'last_commit_author', 'manual_grade', 'comment'])
             #df_grades.set_index('student_identifier', inplace=True)
 
         # Load student repo data and commit counts
@@ -403,8 +404,9 @@ class GitHubAssignment(GitHubClassroomBase):
                 #   If we go down this route, I'll have to think about how to represent the grades in the DataFrame.
                 last_commit_date = row.get('last_commit_date')
                 last_commit_time = row.get('last_commit_time')
+                last_commit_author = row.get('last_commit_author')
 
-                new_row = {'github_username': login, 'grade': grade, 'commit_count': commit_count, 'last_commit_date': last_commit_date, 'last_commit_time': last_commit_time}
+                new_row = {'github_username': login, 'grade': grade, 'commit_count': commit_count, 'last_commit_date': last_commit_date, 'last_commit_time': last_commit_time, 'last_commit_author': last_commit_author}
 
                 if existing_row.empty:
                     # Append new row with default values for manual_grade and comment
@@ -440,6 +442,10 @@ class GitHubAssignment(GitHubClassroomBase):
         self.run_autograding()
         #self.update_grades()
         #self.save_grades_to_csv()
+
+
+    def find_no_commit_candidates(self):
+        """Find the candidates who have not made a submission for this assignment"""
 
 
 class GitHubClassroomManager(GitHubClassroomBase):
