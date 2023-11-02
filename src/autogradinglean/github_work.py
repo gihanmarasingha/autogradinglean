@@ -13,7 +13,6 @@ import pandas as pd
 import toml
 from tqdm import tqdm  # for a progress bar
 
-
 ###################################
 #
 # TODO
