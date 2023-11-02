@@ -452,7 +452,7 @@ class GitHubAssignment(GitHubClassroomBase):
         df_grades.drop(['grade', 'manual_grade'], axis=1, inplace=True)
 
         # Filter student data
-        df_student_data_filtered = self.parent_classroom.df_student_data[~self.parent_classroom.df_student_data[self.student_id_col].isna()]
+        df_student_data_filtered = self.parent_classroom.df_student_data[~self.parent_classroom.df_student_data[self.parent_classroom.student_id_col].isna()]
         
         # Merge the dataframes
         df_grades_out = pd.merge(df_student_data_filtered, df_grades[condition], on='github_username', how='inner')
