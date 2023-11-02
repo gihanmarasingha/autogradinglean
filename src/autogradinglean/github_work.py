@@ -51,7 +51,7 @@ class GitHubClassroomBase:
 
     @staticmethod
     def run_command(command):
-        result = subprocess.run(command, capture_output=True, text=True, shell=True, check=True)
+        result = subprocess.run(command, capture_output=True, text=True, shell=True, check=False)
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
             return None
@@ -99,17 +99,10 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
         if not self.marking_root_dir.exists():
-            raise FileNotFoundError(f"The specified marking_root_dir '{self.marking_root_dir}' does not exist.")
+            msg = f"The specified marking_root_dir '{self.marking_root_dir}' does not exist."
+            raise FileNotFoundError(msg)
 
-        self.logger = logging.getLogger("GitHubClassroom")
-        log_file = self.marking_root_dir / "classroom.log"
-
-        logging.basicConfig(
-            filename=log_file,
-            level=logging.INFO,
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        self._initialise_logger()
 
         self.logger.info("Initaliazing classroom object")
 
@@ -122,7 +115,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         config = self.load_config_from_toml(config_file_path)
 
         if config is None:
-            raise RuntimeError("Failed to load configuration. Initialization aborted.")
+            msg = "Failed to load configuration. Initialization aborted."
+            raise RuntimeError(msg)
         self.id = config["classroom_id"]
 
         # Make paths in TOML relative to marking_root_dir
@@ -147,13 +141,31 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     def queries_dir(self):
         return self._queries_dir
 
-    @staticmethod
-    def load_config_from_toml(config_file_path):
+    def _initialise_logger(self):
+        self.logger = logging.getLogger("GitHubClassroom")
+        self.logger.setLevel(logging.INFO)
+
+        # Define a format for the log messages
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+        # Create a file handler for writing to log file
+        log_file = self.marking_root_dir / "classroom.log"
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+
+        # Create a console handler for output to stdout
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+
+    def load_config_from_toml(self,config_file_path):
         try:
             config = toml.load(config_file_path)
             return config
         except toml.TomlDecodeError as e:
-            print(f"Failed to load configuration from {config_file_path}: {e}")
+            self.logger.error("Failed to load configuration from %s: %s:", config_file_path, e)
             return None
 
     def fetch_assignments(self):
@@ -225,7 +237,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     def find_unlinked_candidates(self):
         """Returns those candidates who have not linked their GitHub account with the roster"""
         mask = self.df_student_data["github_username"].isna() & self.df_student_data[self.student_id_col].notna()
-        unlinked_candidates = self.df_student_data.loc[mask, [self.student_id_col] + self.output_cols]
+        unlinked_candidates = self.df_student_data.loc[mask, [self.student_id_col, *self.output_cols]]
         self.logger.info("Finding unlinked candidates")
         self.save_query_output(unlinked_candidates, "unlinked_candidates", excel=True)
 
@@ -439,11 +451,13 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             # Check if we should proceed with grading
             if existing_row.empty or existing_row.iloc[0]["commit_count"] < commit_count:
                 # Do some grading!
-                # print(f"Grading for {login} with commit_count {commit_count}")
+                #print(f"Grading for {login} with commit_count {commit_count}")
                 repo_path = Path(self.assignment_dir) / "student_repos" / student_repo_name
-
                 # Step 2: Run the lean command
-                result = self.run_command(f"cd {repo_path} && lean .evaluate/evaluate.lean")
+                result = subprocess.run(
+                    f"cd {repo_path} && lean .evaluate/evaluate.lean",
+                    capture_output=True, text=True, shell=True, check=False
+                ).stdout
 
                 # Step 3: Check the output
                 if "sorry" not in result and "error" not in result:
@@ -553,7 +567,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             how="inner",
         )
         df_no_commits = df_no_commits[
-            ["identifier", "github_username"] + self.parent_classroom.output_cols + ["student_repo_name"]
+            ["identifier", "github_username", *self.parent_classroom.output_cols, "student_repo_name"]
         ]
         self.save_query_output(df_no_commits, "no_commits", excel=True)
 
