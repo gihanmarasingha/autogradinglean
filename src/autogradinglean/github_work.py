@@ -108,6 +108,17 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
     def log_file(self):
         """Wrapper for a property that specifies the filename for the log"""
 
+    @property
+    def file_handler(self):
+        """The logger file handler"""
+        return logging.FileHandler(self.log_file)
+
+    @property
+    def console_handler(self):
+        """The logger console handler"""
+        return logging.StreamHandler()
+
+
     def _initialise_logger(self):
         self.logger.setLevel(logging.INFO)
 
@@ -115,15 +126,13 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         # Create a file handler for writing to log file
-        file_handler = logging.FileHandler(self.log_file)
-        file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
+        self.file_handler.setLevel(logging.INFO)
+        self.file_handler.setFormatter(formatter)
+        self.logger.addHandler(self.file_handler)
 
         # Create a console handler for output to stdout
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
+        self.console_handler.setLevel(logging.INFO)
+        self.console_handler.setFormatter(formatter)
 
 
 class GitHubClassroom(GitHubClassroomQueryBase):
@@ -343,9 +352,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         result = self.run_command(command)
 
         if result is None:
-            print("Failed to get starter repository.")
+            self.logger.error("Failed to get starter repository.")
         else:
-            print("Successfully cloned or pulled starter repository.")
+            self.logger.info("Retrieved starter repository.")
 
     def get_starter_repo_mathlib(self):
         """Get the mathlib cache for the starter repository"""
@@ -362,7 +371,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             if result is None:
                 self.logger.error("Failed to get mathlib cache for starter repository.")
             else:
-                self.logger.infor("Successfully got mathlib cache for starter repository.")
+                self.logger.info("Successfully got mathlib cache for starter repository.")
         else:
             self.logger.warning("Starter repository does not exist. Please clone it first.")
 
@@ -391,6 +400,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         page = 1
         per_page = 100  # max allowed value
 
+        self.logger.info("Getting %s student repos", self.accepted)
         pbar = tqdm(total=self.accepted, desc="Getting student repos")
         while True:
             # Fetch accepted assignments from GitHub API
@@ -453,6 +463,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 break
 
         pbar.close()
+        self.logger.info("Received student repos")
 
         # Save updated commit data
         commit_data_df.to_csv(commit_data_file, index=False)
@@ -462,6 +473,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         starter_repo_dir = Path(self.assignment_dir) / "starter_repo"
 
+        self.logger.info("Creating symlinks")
         for student_dir in student_repos_dir.iterdir():
             if student_dir.is_dir():
                 target_link = student_dir / "_target"
@@ -500,6 +512,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
         commit_data_df = pd.read_csv(commit_data_file)
 
+        self.logger.info("Autograding student repos")
         pbar = tqdm(total=self.accepted, desc="Autograding student repos")
         # Loop through each student repo
         for _, row in commit_data_df.iterrows():
@@ -597,13 +610,17 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
     def autograde(self):
         """High-level method to perform all autograding steps"""
-        self.get_starter_repo()
-        self.get_starter_repo_mathlib()
-        self.get_student_repos()
-        self.create_symlinks()
-        self.run_autograding()
-        # self.update_grades()
-        # self.save_grades_to_csv()
+        self.logger.addHandler(self.console_handler)
+        try:
+            self.get_starter_repo()
+            self.get_starter_repo_mathlib()
+            self.get_student_repos()
+            self.create_symlinks()
+            self.run_autograding()
+            # self.update_grades()
+            # self.save_grades_to_csv()
+        finally:
+            self.logger.removeHandler(self.console_handler)
 
     def find_no_commit_candidates(self):
         """Find the candidates who have not made a submission for this assignment. Though the natural
