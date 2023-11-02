@@ -51,7 +51,7 @@ class GitHubClassroomBase:
 
     @staticmethod
     def run_command(command):
-        result = subprocess.run(command, capture_output=True, text=True, shell=True)
+        result = subprocess.run(command, capture_output=True, text=True, shell=True, check=True)
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
             return None
