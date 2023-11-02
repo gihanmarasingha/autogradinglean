@@ -10,22 +10,9 @@ from datetime import datetime
 import logging
 
 ###################################
-#
-#  TODO:
 # 
-#  Currently, I'm using the `accepted-assignments` API. This works pretty well
-#  but does not return submissions from people who didn't choose a student identifier
-#  
-#  The `get assignment grades` API gets grades for anyone who submitted (even if) 
-#  not associated with a student identifier, but *only if* they submitted before the
-#  deadline. Thus, it's no good for working with late submissions
+# TODO
 #
-#  Plan: primarily use `accepted-assignments` data, but also use
-#  `get assignment grades` to identify those people who didn't choose a 
-#  student identifier. This may not really be necessary or useful as there's
-#  little one can do with just a GitHub username.
-
-
 # This module performs all the interaction with GitHub, largely via the GitHub API.
 # Here is documenation on querying classrooms via the API:
 #
