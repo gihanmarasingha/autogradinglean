@@ -40,7 +40,9 @@ import logging
 
 
 class GitHubClassroomBase:
+    """Provides methods to be used in derived classes for running subprocess and outputing query results"""
     _ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    _gh_api = 'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"'
 
     @staticmethod
     def run_command(command):
@@ -51,8 +53,10 @@ class GitHubClassroomBase:
         return result.stdout
 
     @staticmethod
-    def run_gh_command(command):
-        raw_ouput = GitHubClassroomBase.run_command(command)
+    def run_gh_api_command(command):
+        """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
+        we postprocess by removing ANSI escape codes."""
+        raw_ouput = GitHubClassroomBase.run_command(GitHubClassroomBase._gh_api + ' ' + command)
         return GitHubClassroomBase._ansi_escape.sub('', raw_ouput)
     
     def save_query_output(self, df_query_output, base_name, excel=False):
@@ -136,8 +140,8 @@ class GitHubClassroom(GitHubClassroomBase):
 
     def fetch_assignments(self):
         self.logger.info('Fetching assignments from GitHub')
-        command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms/{self.id}/assignments'        
-        output = self.run_gh_command(command)
+        command = f'/classrooms/{self.id}/assignments'        
+        output = self.run_gh_api_command(command)
         
         try:
             assignments_data = json.loads(output)
@@ -220,8 +224,8 @@ class GitHubAssignment(GitHubClassroomBase):
         # Initialize other attributes related to the assignment
 
     def fetch_assignment_info(self):
-        command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}'
-        output = self.run_gh_command(command)
+        command = f'/assignments/{self.id}'
+        output = self.run_gh_api_command(command)
         
         try:
             assignment_data = json.loads(output)
@@ -245,7 +249,7 @@ class GitHubAssignment(GitHubClassroomBase):
             # Otherwise, clone the starter repo
             command = f"gh repo clone {self.starter_code_repository} {starter_repo_path}"
         
-        result = self.run_gh_command(command)
+        result = self.run_command(command)
         
         if result is None:
             print("Failed to get starter repository.")
@@ -287,8 +291,8 @@ class GitHubAssignment(GitHubClassroomBase):
         pbar = tqdm(total=self.accepted, desc="Getting student repos")
         while True:
             # Fetch accepted assignments from GitHub API
-            command = f'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
-            output = self.run_gh_command(command)
+            command = f'/assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}'
+            output = self.run_gh_api_command(command)
             
             try:
                 accepted_assignments = json.loads(output)
@@ -492,8 +496,8 @@ class GitHubClassroomManager(GitHubClassroomBase):
         self.fetch_classrooms()
 
     def fetch_classrooms(self):
-        command = 'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" /classrooms'
-        output = self.run_gh_command(command)
+        command = '/classrooms'
+        output = self.run_gh_api_command(command)
         try:
             classrooms_data = json.loads(output)
             self.df_classrooms = pd.DataFrame(classrooms_data)
