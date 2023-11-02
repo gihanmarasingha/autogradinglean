@@ -3,9 +3,9 @@ import logging
 import os
 import re
 import subprocess
+from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
-from abc import ABC, abstractmethod
 
 import pandas as pd
 import toml
