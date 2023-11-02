@@ -27,6 +27,7 @@ dependencies = [
   "pandas",
   "toml",
   "tqdm",
+  "openpyxl",
 ]
 
 [project.urls]
