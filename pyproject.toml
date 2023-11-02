@@ -26,6 +26,8 @@ classifiers = [
 ]
 dependencies = [
   "pandas",
+  "toml",
+  "tqdm",
 ]
 
 [project.urls]
