@@ -5,7 +5,7 @@ import os
 import re
 import subprocess
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -79,7 +79,7 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
         """Writes a dataframe as a CSV (default) or excel. The filename is formed from the basename and
         the current date and time"""
         # Generate the current date and time in the format YYMMDDHHMMSS
-        current_time = datetime.now().strftime(r"%Y%m%d_%H%M_%S")
+        current_time = datetime.now(tz=timezone.utc).strftime(r"%Y%m%d_%H%M_%S")
 
         # Create the filename
         if excel:
@@ -103,7 +103,7 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
 class GitHubClassroom(GitHubClassroomQueryBase):
     """Class that encapsulates a GitHub Classroom. Contains GitHubAssignment objects
     exposes functions for reporting on unlinked candidates and other useful information.
-    
+
     Configured by a toml file `config.toml` in the specified directory. The file should take the following form:
 
         classroom_id = "666666"
