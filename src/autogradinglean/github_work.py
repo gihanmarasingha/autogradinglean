@@ -5,6 +5,7 @@ import re
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from abc import ABC, abstractmethod
 
 import pandas as pd
 import toml
@@ -24,7 +25,8 @@ from tqdm import tqdm  # for a progress bar
 # perform authentication as a GitHub App.
 # Some useful reading is to be found at
 #
-#   https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps
+#   https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/
+#       managing-private-keys-for-github-apps
 #
 # and at
 #
@@ -35,7 +37,8 @@ from tqdm import tqdm  # for a progress bar
 # 1) create grade sheets that merge the output of the autograder with the SITS data
 # 2) create outputs for mail merge:
 # 2.1) Write to sits candidates with no corresponding github username (classroom level)
-# 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct (classroom level)
+# 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct
+#       (classroom level)
 # 2.3) Write to all candidates (with a linked roster) with their grades and comments (assignment level)
 # 2.4) Output all accepted users who have not selected a student ID (assignment level)
 
@@ -48,7 +51,7 @@ class GitHubClassroomBase:
 
     @staticmethod
     def run_command(command):
-        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, shell=True)
+        result = subprocess.run(command, capture_output=True, text=True, shell=True)
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
             return None
@@ -60,6 +63,13 @@ class GitHubClassroomBase:
         we postprocess by removing ANSI escape codes."""
         raw_ouput = GitHubClassroomBase.run_command(GitHubClassroomBase._gh_api + " " + command)
         return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
+
+
+class GitHubClassroomQueryBase(ABC,GitHubClassroomBase):
+    @property
+    @abstractmethod
+    def queries_dir(self):
+        pass
 
     def save_query_output(self, df_query_output, base_name, excel=False):
         # Generate the current date and time in the format YYMMDDHHMMSS
@@ -83,8 +93,7 @@ class GitHubClassroomBase:
         else:
             df_query_output.to_csv(file_path, index=False)
 
-
-class GitHubClassroom(GitHubClassroomBase):
+class GitHubClassroom(GitHubClassroomQueryBase):
     def __init__(self, marking_root_dir):
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
@@ -103,7 +112,7 @@ class GitHubClassroom(GitHubClassroomBase):
 
         self.logger.info("Initaliazing classroom object")
 
-        self.queries_dir = self.marking_root_dir / "query_output"
+        self._queries_dir = self.marking_root_dir / "query_output"
 
         # Load configuration from TOML file
 
@@ -112,7 +121,7 @@ class GitHubClassroom(GitHubClassroomBase):
         config = self.load_config_from_toml(config_file_path)
 
         if config is None:
-            raise Exception("Failed to load configuration. Initialization aborted.")
+            raise RuntimeError("Failed to load configuration. Initialization aborted.")
         self.id = config["classroom_id"]
 
         # Make paths in TOML relative to marking_root_dir
@@ -133,12 +142,16 @@ class GitHubClassroom(GitHubClassroomBase):
         self.merge_student_data()
         self.initialize_assignments()  # Initialize GitHubAssignment objects
 
+    @property
+    def queries_dir(self):
+        return self._queries_dir
+
     @staticmethod
     def load_config_from_toml(config_file_path):
         try:
             config = toml.load(config_file_path)
             return config
-        except Exception as e:
+        except toml.TomlDecodeError as e:
             print(f"Failed to load configuration from {config_file_path}: {e}")
             return None
 
@@ -152,7 +165,7 @@ class GitHubClassroom(GitHubClassroomBase):
             df_assignments = pd.DataFrame(assignments_data)
             return df_assignments
         except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to decode JSON: {e}")
+            self.logger.error("Failed to decode JSON: %s", e)
             return None
 
     def merge_student_data(self):
@@ -185,7 +198,7 @@ class GitHubClassroom(GitHubClassroomBase):
         self.df_sits_candidates = pd.read_excel(new_sits_candidate_file, dtype=object)
 
     def initialize_assignments(self):
-        for index, row in self.df_assignments.iterrows():
+        for _, row in self.df_assignments.iterrows():
             assignment_id = row["id"]
             new_assignment = GitHubAssignment(assignment_id, self)
             self.assignments.append(new_assignment)
@@ -216,18 +229,22 @@ class GitHubClassroom(GitHubClassroomBase):
         self.save_query_output(unlinked_candidates, "unlinked_candidates", excel=True)
 
 
-class GitHubAssignment(GitHubClassroomBase):
+class GitHubAssignment(GitHubClassroomQueryBase):
     def __init__(self, assignment_id, parent_classroom):
         self.id = assignment_id
         self.parent_classroom = parent_classroom  # Reference to the parent GitHubClassroom object
         self.assignment_dir = self.parent_classroom.marking_root_dir / f"assignment{self.id}"
         if not self.assignment_dir.exists():
             self.assignment_dir.mkdir(parents=True)  # Create the directory if it doesn't exist
-        self.queries_dir = self.assignment_dir / "query_output"
+        self._queries_dir = self.assignment_dir / "query_output"
         # self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
 
         # Initialize other attributes related to the assignment
+
+    @property
+    def queries_dir(self):
+        return self._queries_dir
 
     def fetch_assignment_info(self):
         command = f"/assignments/{self.id}"
@@ -335,7 +352,8 @@ class GitHubAssignment(GitHubClassroomBase):
                             self.run_command(clone_command)
 
                         # TODO: think about how the following is affected by different time zones and locales.
-                        git_log_command = f"cd {student_repo_path} && git log -1 --format='%cd,%an' --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
+                        git_log_command = f"cd {student_repo_path} && git log -1 --format='%cd,%an'" \
+                             " --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
                         git_log_result = self.run_command(git_log_command)
 
                         # Update or add the row in the DataFrame
@@ -408,7 +426,7 @@ class GitHubAssignment(GitHubClassroomBase):
 
         pbar = tqdm(total=self.accepted, desc="Autograding student repos")
         # Loop through each student repo
-        for index, row in commit_data_df.iterrows():
+        for _, row in commit_data_df.iterrows():
             commit_count = row.get("commit_count", 0)
             login = row["login"]
             student_repo_name = row["student_repo_name"]
@@ -437,11 +455,14 @@ class GitHubAssignment(GitHubClassroomBase):
                     grade = 0
 
                 # Update the DataFrame
-                # TODO: think carefully about what happens if a student makes a commit after the deadline. There are several possibilities:
-                # 1) The student made no commit before the deadline. Then this counts as their only commit. The Hub can determine what mark should be awarded.
+                # TODO: think carefully about what happens if a student makes a commit after the deadline.
+                #   There are several possibilities:
+                # 1) The student made no commit before the deadline. Then this counts as their only commit. The Hub can
+                #       determine what mark should be awarded.
                 # 2) The student made a commit before the deadline *and* after the deadline.
-                #   The fairest resolution might be to start by grading the last submission before the deadline. If (on the advice of the Hub),
-                #   mitigation is given, then a chosen submission after the deadline should be marked.
+                #   The fairest resolution might be to start by grading the last submission before the deadline. If
+                #   (on the advice of the Hub), mitigation is given, then a chosen submission after the deadline should
+                #   be marked.
                 #   If we go down this route, I'll have to think about how to represent the grades in the DataFrame.
                 last_commit_date = row.get("last_commit_date")
                 last_commit_time = row.get("last_commit_time")
@@ -534,7 +555,8 @@ class GitHubAssignment(GitHubClassroomBase):
             right_on="login",
             how="inner",
         )
-        df_no_commits = df_no_commits[["identifier", "github_username"] + self.output_cols + ["student_repo_name"]]
+        df_no_commits = df_no_commits[["identifier", "github_username"] + self.parent_classroom.output_cols + \
+                                       ["student_repo_name"]]
         self.save_query_output(df_no_commits, "no_commits", excel=True)
 
 
