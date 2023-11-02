@@ -49,12 +49,11 @@ class GitHubClassroomBase:
     """Provides methods to be used in derived classes for running subprocess and outputing query results"""
 
     _ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-    _gh_api = 'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"'
 
     @staticmethod
     def run_command(command, cwd=None):
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
-        result = subprocess.run(command, capture_output=True, text=True, shell=True, check=False, cwd=cwd)
+        result = subprocess.run(command, capture_output=True, text=True, shell=False, check=False, cwd=cwd)
         if result.returncode != 0:
             return None
         return result.stdout
@@ -63,7 +62,8 @@ class GitHubClassroomBase:
     def run_gh_api_command(command):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
-        raw_ouput = GitHubClassroomBase.run_command(GitHubClassroomBase._gh_api + " " + command)
+        gh_api = ["gh","api", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"]
+        raw_ouput = GitHubClassroomBase.run_command([*gh_api, command])
         return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
 
 
@@ -322,12 +322,12 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         if starter_repo_path.exists():
             # If the starter repo directory exists, pull the latest changes
-            command = f"cd {starter_repo_path} && git pull"
+            command, cwd = (["git", "pull"]), starter_repo_path
         else:
             # Otherwise, clone the starter repo
-            command = f"gh repo clone {self.starter_code_repository} {starter_repo_path}"
+            command, cwd = (["gh", "repo", "clone", f"{self.starter_code_repository}", f"{starter_repo_path}"]), None
 
-        result = self.run_command(command)
+        result = self.run_command(command, cwd)
 
         if result is None:
             self.logger.addHandler(self.console_handler)
@@ -345,11 +345,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         try:
             if starter_repo_path.exists():
                 # If the starter repo directory exists, run leanproject get-mathlib-cache
-                command = "leanproject get-mathlib-cache"
+                command = ["leanproject", "get-mathlib-cache"]
                 result = self.run_command(command, cwd=starter_repo_path)
 
                 if result is None:
-                    self.logger.error("Failed to get mathlib cache for starter repository.")              
+                    self.logger.error("Failed to get mathlib cache for starter repository.")
                 else:
                     self.logger.info("...successfully retrieved mathlib cache for starter repository.")
             else:
@@ -410,19 +410,19 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                         # Logic to clone or pull the repo
                         if student_repo_path.exists():
                             # Pull the repo
-                            pull_command = f"cd {student_repo_path} && git pull"
-                            self.run_command(pull_command)
+                            pull_command = ["git", "pull"]
+                            self.run_command(pull_command, cwd=student_repo_path)
                         else:
                             # Clone the repo
-                            clone_command = f"git clone {repo_info.get('html_url', '')} {student_repo_path}"
+                            clone_command = ["git", "clone", f"{repo_info.get('html_url', '')}", f"{student_repo_path}"]
                             self.run_command(clone_command)
 
                         # TODO: think about how the following is affected by different time zones and locales.
-                        git_log_command = (
-                            f"cd {student_repo_path} && git log -1 --format='%cd,%an'"
-                            " --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
-                        )
-                        git_log_result = self.run_command(git_log_command)
+                        git_log_command = [
+                            "git", "log",  "-1",  r"--format='%cd,%an'",
+                            r"--date=format-local:'%d/%m/%y,%H:%M:%S'", r"src/assignment.lean"
+                        ]
+                        git_log_result = self.run_command(git_log_command, cwd=student_repo_path)
 
                         # Update or add the row in the DataFrame
                         new_row = {
@@ -515,8 +515,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 repo_path = Path(self.assignment_dir) / "student_repos" / student_repo_name
                 # Step 2: Run the lean command
                 result = subprocess.run(
-                    f"cd {repo_path} && lean .evaluate/evaluate.lean",
-                    capture_output=True, text=True, shell=True, check=False
+                    ["lean", ".evaluate/evaluate.lean"],
+                    capture_output=True, text=True, shell=False, check=False, cwd=repo_path
                 ).stdout
 
                 # Step 3: Check the output
