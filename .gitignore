@@ -1,2 +1,3 @@
 .venv/
 dist/
+settings.json
