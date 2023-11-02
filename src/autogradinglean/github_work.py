@@ -65,7 +65,7 @@ class GitHubClassroomBase:
         return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
 
 
-class GitHubClassroomQueryBase(ABC,GitHubClassroomBase):
+class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
     @property
     @abstractmethod
     def queries_dir(self):
@@ -92,6 +92,7 @@ class GitHubClassroomQueryBase(ABC,GitHubClassroomBase):
             df_query_output.to_excel(file_path, index=False)
         else:
             df_query_output.to_csv(file_path, index=False)
+
 
 class GitHubClassroom(GitHubClassroomQueryBase):
     def __init__(self, marking_root_dir):
@@ -352,8 +353,10 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                             self.run_command(clone_command)
 
                         # TODO: think about how the following is affected by different time zones and locales.
-                        git_log_command = (f"cd {student_repo_path} && git log -1 --format='%cd,%an'"
-                             " --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean")
+                        git_log_command = (
+                            f"cd {student_repo_path} && git log -1 --format='%cd,%an'"
+                            " --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
+                        )
                         git_log_result = self.run_command(git_log_command)
 
                         # Update or add the row in the DataFrame
@@ -549,8 +552,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             right_on="login",
             how="inner",
         )
-        df_no_commits = df_no_commits[["identifier", "github_username"] + self.parent_classroom.output_cols + \
-                                       ["student_repo_name"]]
+        df_no_commits = df_no_commits[
+            ["identifier", "github_username"] + self.parent_classroom.output_cols + ["student_repo_name"]
+        ]
         self.save_query_output(df_no_commits, "no_commits", excel=True)
 
 
