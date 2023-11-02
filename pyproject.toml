@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "autogradinglean"
 dynamic = ["version"]
-description = ''
+description = 'Tools for working with Lean 3 assignments on GitHub Classroom.'
 readme = "README.md"
 requires-python = ">=3.7"
 license = "MIT"
-keywords = []
+keywords = ['autograding', 'lean', 'Lean 3', 'GitHub Classroom', 'GitHub', 'classroom']
 authors = [
   { name = "Gihan Marasingha", email = "gihan.marasingha@gmail.com" },
 ]
@@ -21,8 +21,7 @@ classifiers = [
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
+  "License :: OSI Approved :: MIT License",
 ]
 dependencies = [
   "pandas",
@@ -31,9 +30,9 @@ dependencies = [
 ]
 
 [project.urls]
-Documentation = "https://github.com/unknown/autogradinglean#readme"
-Issues = "https://github.com/unknown/autogradinglean/issues"
-Source = "https://github.com/unknown/autogradinglean"
+Documentation = "https://github.com/gihanmarasingha/autogradinglean#readme"
+Issues = "https://github.com/gihanmarasingha/autogradinglean/issues"
+Source = "https://github.com/gihanmarasingha/autogradinglean"
 
 [tool.hatch.version]
 path = "src/autogradinglean/__about__.py"
