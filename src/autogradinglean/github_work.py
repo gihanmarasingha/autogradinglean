@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import subprocess
+import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from pathlib import Path
@@ -111,7 +112,7 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
             df_query_output.to_csv(file_path, index=False)
 
     def _initialise_logger(self, logger_name, log_file):
-        logger = logging.getLogger(logger_name)
+        logger = logging.getLogger(logger_name + uuid.uuid4().hex)
         logger.setLevel(logging.INFO)
 
         # Define a format for the log messages
