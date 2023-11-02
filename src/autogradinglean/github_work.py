@@ -15,12 +15,12 @@ from tqdm import tqdm  # for a progress bar
 ###################################
 #
 # TODO
-# 
+#
 # Logging does not work as expected. In particular, adding the consoleHandler (which)
 # happens in the `autograde` function seems to alter how the filehandler works, even after
 # restarting the program. Probably the logging process isn't closing cleanly.
 #
-# I need to read more about logging. 
+# I need to read more about logging.
 #
 
 
