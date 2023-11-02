@@ -15,7 +15,14 @@ from tqdm import tqdm  # for a progress bar
 
 ###################################
 #
-# TODO
+# TODO: Speed up initialization of a GitHubAssignment object by only running fetch_assignment_info
+# when one of the GitHubAssignment's methods are called. Indeed, perhaps fetch_assignment_info
+# should be called anyway when running grading functions. The reason being that the assignment
+# data could change between runs.
+# 
+#
+
+###################################
 #
 # This module performs all the interaction with GitHub, largely via the GitHub API.
 # Here is documenation on querying classrooms via the API:
@@ -23,7 +30,7 @@ from tqdm import tqdm  # for a progress bar
 #   https://docs.github.com/en/rest/classroom/classroom
 #
 # The current version of the module takes a simple approach, calling GitHub's `gh` CLI.
-# I plan to use the `PyGithub` package in the future. What I still need to understand is how to
+# TODO: I plan to use the `PyGithub` package in the future. What I still need to understand is how to
 # perform authentication as a GitHub App.
 # Some useful reading is to be found at
 #
@@ -152,7 +159,6 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.logger, self.file_handler, self.console_handler = self._initialise_logger(logger_name, log_file)
 
         self.logger.info("Initializing classroom object")
-
         self._queries_dir = self.marking_root_dir / "query_output"
 
         # Load configuration from TOML file
@@ -163,6 +169,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
         if config is None:
             msg = "Failed to load configuration. Initialization aborted."
+            self.logger.error(msg)
             raise RuntimeError(msg)
         self.id = config["classroom_id"]
 
