@@ -68,12 +68,11 @@ class GitHubClassroomBase:
 
 
 class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
-    """Abstract base class for classes that output query results"""
+    """Abstract base class for classes that output query results and performs logging"""
     @property
     @abstractmethod
     def queries_dir(self):
         """Wrapper for a property that specifies the directory for query output"""
-
 
     def save_query_output(self, df_query_output, base_name, *, excel=False):
         """Writes a dataframe as a CSV (default) or excel. The filename is formed from the basename and
@@ -98,6 +97,33 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
             df_query_output.to_excel(file_path, index=False)
         else:
             df_query_output.to_csv(file_path, index=False)
+
+    @property
+    @abstractmethod
+    def logger(self):
+        """Wrapper for a property that specifies the name of the logger"""
+
+    @property
+    @abstractmethod
+    def log_file(self):
+        """Wrapper for a property that specifies the filename for the log"""
+
+    def _initialise_logger(self):
+        self.logger.setLevel(logging.INFO)
+
+        # Define a format for the log messages
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+        # Create a file handler for writing to log file
+        file_handler = logging.FileHandler(self.log_file)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        self.logger.addHandler(file_handler)
+
+        # Create a console handler for output to stdout
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
 
 
 class GitHubClassroom(GitHubClassroomQueryBase):
@@ -127,7 +153,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         if not self.marking_root_dir.exists():
             msg = f"The specified marking_root_dir '{self.marking_root_dir}' does not exist."
             raise FileNotFoundError(msg)
-
+        
         self._initialise_logger()
 
         self.logger.info("Initaliazing classroom object")
@@ -166,25 +192,14 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     @property
     def queries_dir(self):
         return self._queries_dir
-
-    def _initialise_logger(self):
-        self.logger = logging.getLogger("GitHubClassroom")
-        self.logger.setLevel(logging.INFO)
-
-        # Define a format for the log messages
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-
-        # Create a file handler for writing to log file
-        log_file = self.marking_root_dir / "classroom.log"
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(formatter)
-        self.logger.addHandler(file_handler)
-
-        # Create a console handler for output to stdout
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
+    
+    @property
+    def logger(self):
+        return logging.getLogger("GitHubClassroom")
+    
+    @property
+    def log_file(self):
+        return self.marking_root_dir / "classroom.log"
 
     def load_config_from_toml(self,config_file_path):
         """Loads data from a toml file"""
@@ -280,14 +295,21 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         if not self.assignment_dir.exists():
             self.assignment_dir.mkdir(parents=True)  # Create the directory if it doesn't exist
         self._queries_dir = self.assignment_dir / "query_output"
+        self._initialise_logger()
         # self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
-
-        # Initialize other attributes related to the assignment
 
     @property
     def queries_dir(self):
         return self._queries_dir
+    
+    @property
+    def logger(self):
+        return logging.getLogger(f"GitHubAssignment{self.id}")
+    
+    @property
+    def log_file(self):
+        return self.assignment_dir / f"assignment{self.id}.log"
 
     def fetch_assignment_info(self):
         """Gets information about this assignment."""
@@ -305,6 +327,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         except json.JSONDecodeError as e:
             print(f"Failed to decode JSON: {e}")
             return None
+        self.logger.info("Received assignment information")
 
     def get_starter_repo(self):
         """Download the starter repository for this assignment"""
@@ -328,6 +351,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         """Get the mathlib cache for the starter repository"""
         starter_repo_path = Path(self.assignment_dir) / "starter_repo"
 
+        self.logger.info("Getting mathlib for starter repo...")
+
         if starter_repo_path.exists():
             # If the starter repo directory exists, run leanproject get-mathlib-cache
             command = f"cd {starter_repo_path} && leanproject get-mathlib-cache"
@@ -335,11 +360,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             result = self.run_command(command)
 
             if result is None:
-                print("Failed to get mathlib cache for starter repository.")
+                self.logger.error("Failed to get mathlib cache for starter repository.")
             else:
-                print("Successfully got mathlib cache for starter repository.")
+                self.logger.infor("Successfully got mathlib cache for starter repository.")
         else:
-            print("Starter repository does not exist. Please clone it first.")
+            self.logger.warning("Starter repository does not exist. Please clone it first.")
 
     def get_student_repos(self):
         """Download the student repos for this assignment"""
