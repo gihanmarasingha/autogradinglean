@@ -110,41 +110,25 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
         else:
             df_query_output.to_csv(file_path, index=False)
 
-    @property
-    @abstractmethod
-    def logger(self):
-        """Wrapper for a property that specifies the name of the logger"""
-
-    @property
-    @abstractmethod
-    def log_file(self):
-        """Wrapper for a property that specifies the filename for the log"""
-
-    @property
-    def file_handler(self):
-        """The logger file handler"""
-        return logging.FileHandler(self.log_file)
-
-    @property
-    def console_handler(self):
-        """The logger console handler"""
-        return logging.StreamHandler()
-
-
-    def _initialise_logger(self):
-        self.logger.setLevel(logging.INFO)
+    def _initialise_logger(self, logger_name, log_file):
+        logger = logging.getLogger(logger_name)
+        logger.setLevel(logging.INFO)
 
         # Define a format for the log messages
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         # Create a file handler for writing to log file
-        self.file_handler.setLevel(logging.INFO)
-        self.file_handler.setFormatter(formatter)
-        self.logger.addHandler(self.file_handler)
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
 
         # Create a console handler for output to stdout
-        self.console_handler.setLevel(logging.INFO)
-        self.console_handler.setFormatter(formatter)
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+
+        return logger, file_handler, console_handler
 
 
 class GitHubClassroom(GitHubClassroomQueryBase):
@@ -175,9 +159,11 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             msg = f"The specified marking_root_dir '{self.marking_root_dir}' does not exist."
             raise FileNotFoundError(msg)
 
-        self._initialise_logger()
+        logger_name = "GitHubClassroom"
+        log_file = self.marking_root_dir / "classroom.log"
+        self.logger, self.file_handler, self.console_handler = self._initialise_logger(logger_name, log_file)
 
-        self.logger.info("Initaliazing classroom object")
+        self.logger.info("Initializing classroom object")
 
         self._queries_dir = self.marking_root_dir / "query_output"
 
@@ -213,14 +199,6 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     @property
     def queries_dir(self):
         return self._queries_dir
-
-    @property
-    def logger(self):
-        return logging.getLogger("GitHubClassroom")
-
-    @property
-    def log_file(self):
-        return self.marking_root_dir / "classroom.log"
 
     def load_config_from_toml(self,config_file_path):
         """Loads data from a toml file"""
@@ -316,21 +294,15 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         if not self.assignment_dir.exists():
             self.assignment_dir.mkdir(parents=True)  # Create the directory if it doesn't exist
         self._queries_dir = self.assignment_dir / "query_output"
-        self._initialise_logger()
+        logger_name = f"GitHubAssignment{self.id}"
+        log_file = self.assignment_dir / f"assignment{self.id}.log"
+        self.logger, self.file_handler, self.console_handler = self._initialise_logger(logger_name, log_file)
         # self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
 
     @property
     def queries_dir(self):
         return self._queries_dir
-
-    @property
-    def logger(self):
-        return logging.getLogger(f"GitHubAssignment{self.id}")
-
-    @property
-    def log_file(self):
-        return self.assignment_dir / f"assignment{self.id}.log"
 
     def fetch_assignment_info(self):
         """Gets information about this assignment."""
@@ -383,7 +355,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             if result is None:
                 self.logger.error("Failed to get mathlib cache for starter repository.")
             else:
-                self.logger.info("Successfully got mathlib cache for starter repository.")
+                self.logger.info("...successfully retrieved mathlib cache for starter repository.")
         else:
             self.logger.warning("Starter repository does not exist. Please clone it first.")
 
@@ -524,7 +496,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
         commit_data_df = pd.read_csv(commit_data_file)
 
-        self.logger.info("Autograding student repos")
+        self.logger.info("Autograding student repos...")
         pbar = tqdm(total=self.accepted, desc="Autograding student repos")
         # Loop through each student repo
         for _, row in commit_data_df.iterrows():
@@ -587,6 +559,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             pbar.update(1)
 
         pbar.close()
+        self.logger.info("...autograding complete")
         # Save the updated DataFrame
         df_grades.to_csv(grades_file, index=False)
 
