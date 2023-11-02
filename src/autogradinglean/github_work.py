@@ -153,7 +153,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         if not self.marking_root_dir.exists():
             msg = f"The specified marking_root_dir '{self.marking_root_dir}' does not exist."
             raise FileNotFoundError(msg)
-        
+
         self._initialise_logger()
 
         self.logger.info("Initaliazing classroom object")
@@ -192,11 +192,11 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     @property
     def queries_dir(self):
         return self._queries_dir
-    
+
     @property
     def logger(self):
         return logging.getLogger("GitHubClassroom")
-    
+
     @property
     def log_file(self):
         return self.marking_root_dir / "classroom.log"
@@ -302,11 +302,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
     @property
     def queries_dir(self):
         return self._queries_dir
-    
+
     @property
     def logger(self):
         return logging.getLogger(f"GitHubAssignment{self.id}")
-    
+
     @property
     def log_file(self):
         return self.assignment_dir / f"assignment{self.id}.log"
