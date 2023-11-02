@@ -57,7 +57,6 @@ class GitHubClassroomBase:
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
         result = subprocess.run(command, capture_output=True, text=True, shell=True, check=False)
         if result.returncode != 0:
-            print(f"Error: {result.stderr}")
             return None
         return result.stdout
 
@@ -308,7 +307,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.starter_code_repository = assignment_data.get("starter_code_repository", {}).get("full_name")
             self.deadline = assignment_data.get("deadline")
         except json.JSONDecodeError as e:
-            print(f"Failed to decode JSON: {e}")
+            self.logger.error("Failed to decode JSON %s", e)
             return None
         self.logger.info("Received assignment information")
 
@@ -433,7 +432,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 page += 1  # increment to fetch the next page
 
             except json.JSONDecodeError as e:
-                print(f"Failed to decode JSON: {e}")
+                self.logger.error("Failed to decode JSON: %s", e)
                 break
 
         pbar.close()
@@ -639,4 +638,4 @@ class GitHubClassroomManager(GitHubClassroomBase):
             classrooms_data = json.loads(output)
             self.df_classrooms = pd.DataFrame(classrooms_data)
         except json.JSONDecodeError as e:
-            print(f"Failed to decode JSON: {e}")
+            logging.error("Failed to decode JSON: %s", e)
