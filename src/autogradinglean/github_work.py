@@ -1,3 +1,4 @@
+"""Autograding with GitHub Classroom and Lean 3"""
 import json
 import logging
 import os
@@ -51,6 +52,7 @@ class GitHubClassroomBase:
 
     @staticmethod
     def run_command(command):
+        """Runs the specified command as a subprocess. Returns None on error or the stdout"""
         result = subprocess.run(command, capture_output=True, text=True, shell=True, check=False)
         if result.returncode != 0:
             print(f"Error: {result.stderr}")
@@ -66,12 +68,16 @@ class GitHubClassroomBase:
 
 
 class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
+    """Abstract base class for classes that output query results"""
     @property
     @abstractmethod
     def queries_dir(self):
-        pass
+        """Wrapper for a property that specifies the directory for query output"""
+
 
     def save_query_output(self, df_query_output, base_name, *, excel=False):
+        """Writes a dataframe as a CSV (default) or excel. The filename is formed from the basename and
+        the current date and time"""
         # Generate the current date and time in the format YYMMDDHHMMSS
         current_time = datetime.now().strftime(r"%Y%m%d_%H%M_%S")
 
@@ -95,6 +101,26 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
 
 
 class GitHubClassroom(GitHubClassroomQueryBase):
+    """Class that encapsulates a GitHub Classroom. Contains GitHubAssignment objects
+    exposes functions for reporting on unlinked candidates and other useful information.
+    
+    Configured by a toml file `config.toml` in the specified directory. The file should take the following form:
+
+        classroom_id = "666666"
+        classroom_roster_csv = "classroom_roster.csv"
+
+        [candidate_file]
+        filename = "mth9999.csv"
+        student_id_col = "Candidate No"
+        output_cols = ["Forename", "Surname", "Email Address"]
+
+    Above,
+    * classroom_id is the GitHub classroom id (which can be found via a GitHutClassrooms object),
+    * classrooom_roster_csv is the name of the file downloaded from GitHub Classroom,
+    * filename is the name of a CSV file containing student data from your institution's record system,
+    * student_id_col is the name of the column in 'filename' that gives the GitHub student identifiers,
+    * output_cols is a list of 'filename' columns that should be output by certain queries.
+    """
     def __init__(self, marking_root_dir):
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
@@ -161,6 +187,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         console_handler.setFormatter(formatter)
 
     def load_config_from_toml(self,config_file_path):
+        """Loads data from a toml file"""
         try:
             config = toml.load(config_file_path)
             return config
@@ -169,6 +196,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             return None
 
     def fetch_assignments(self):
+        """Gets a table of dataframe of assignments for this classroom"""
         self.logger.info("Fetching assignments from GitHub")
         command = f"/classrooms/{self.id}/assignments"
         output = self.run_gh_api_command(command)
@@ -204,13 +232,14 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         # Save the DataFrame to a CSV file
         # self.df_student_data.to_csv(file_path, index=False)
 
-    def update_classroom_roster(self, new_classroom_roster_csv):
-        self.df_classroom_roster = pd.read_csv(new_classroom_roster_csv, dtype=object)
+    # def update_classroom_roster(self, new_classroom_roster_csv):
+    #     self.df_classroom_roster = pd.read_csv(new_classroom_roster_csv, dtype=object)
 
-    def update_sits_candidates(self, new_sits_candidate_file):
-        self.df_sits_candidates = pd.read_excel(new_sits_candidate_file, dtype=object)
+    # def update_sits_candidates(self, new_sits_candidate_file):
+    #     self.df_sits_candidates = pd.read_excel(new_sits_candidate_file, dtype=object)
 
     def initialize_assignments(self):
+        """Create a list of assignments"""
         for _, row in self.df_assignments.iterrows():
             assignment_id = row["id"]
             new_assignment = GitHubAssignment(assignment_id, self)
@@ -243,6 +272,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
 
 class GitHubAssignment(GitHubClassroomQueryBase):
+    """Represents a GitHub assignment and provides methods for downloading repositories, autograding, etc."""
     def __init__(self, assignment_id, parent_classroom):
         self.id = assignment_id
         self.parent_classroom = parent_classroom  # Reference to the parent GitHubClassroom object
@@ -260,14 +290,15 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         return self._queries_dir
 
     def fetch_assignment_info(self):
+        """Gets information about this assignment."""
         command = f"/assignments/{self.id}"
         output = self.run_gh_api_command(command)
 
         try:
             assignment_data = json.loads(output)
-            self.slug = assignment_data.get("slug")
+            #self.slug = assignment_data.get("slug")
             self.accepted = assignment_data.get("accepted")  # the number of accepted submissions
-            self.title = assignment_data.get("title")
+            #self.title = assignment_data.get("title")
             self.type = assignment_data.get("type")
             self.starter_code_repository = assignment_data.get("starter_code_repository", {}).get("full_name")
             self.deadline = assignment_data.get("deadline")
@@ -276,6 +307,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             return None
 
     def get_starter_repo(self):
+        """Download the starter repository for this assignment"""
         starter_repo_path = Path(self.assignment_dir) / "starter_repo"
 
         if starter_repo_path.exists():
@@ -293,6 +325,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             print("Successfully cloned or pulled starter repository.")
 
     def get_starter_repo_mathlib(self):
+        """Get the mathlib cache for the starter repository"""
         starter_repo_path = Path(self.assignment_dir) / "starter_repo"
 
         if starter_repo_path.exists():
@@ -309,6 +342,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             print("Starter repository does not exist. Please clone it first.")
 
     def get_student_repos(self):
+        """Download the student repos for this assignment"""
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
 
@@ -399,6 +433,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         commit_data_df.to_csv(commit_data_file, index=False)
 
     def create_symlinks(self):
+        """Symlink the mathlib and leanpkg.path from the starter repo to the student repos"""
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         starter_repo_dir = Path(self.assignment_dir) / "starter_repo"
 
@@ -414,6 +449,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                     os.symlink(starter_repo_dir / "leanpkg.path", leanpkg_link)
 
     def run_autograding(self):
+        """Runs autograding on all student repositories. Assumes that we have retrieved the starter repo,
+        the starter repo mathlib, downloaded the student repos and created the symlinks"""
         # Logic to run autograding
         # Step 0: Load the existing grades DataFrame or create a new one
         grades_file = Path(self.assignment_dir) / "grades.csv"
@@ -435,7 +472,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             # df_grades.set_index('student_identifier', inplace=True)
 
         # Load student repo data and commit counts
-        # ASSUMES WE HAVE RECENTLY RUN `get_student_repos`
         commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
         commit_data_df = pd.read_csv(commit_data_file)
 
@@ -535,7 +571,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
     #    pass
 
     def autograde(self):
-        # High-level method to perform all autograding stepss
+        """High-level method to perform all autograding steps"""
         self.get_starter_repo()
         self.get_starter_repo_mathlib()
         self.get_student_repos()
@@ -573,11 +609,13 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
 
 class GitHubClassroomManager(GitHubClassroomBase):
+    """A class for representing all classrooms for the current user"""
     def __init__(self):
         self.df_classrooms = pd.DataFrame()
         self.fetch_classrooms()
 
     def fetch_classrooms(self):
+        """Get all classroom data"""
         command = "/classrooms"
         output = self.run_gh_api_command(command)
         try:
