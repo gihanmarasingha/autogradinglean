@@ -71,7 +71,7 @@ class GitHubClassroomQueryBase(ABC,GitHubClassroomBase):
     def queries_dir(self):
         pass
 
-    def save_query_output(self, df_query_output, base_name, excel=False):
+    def save_query_output(self, df_query_output, base_name, *, excel=False):
         # Generate the current date and time in the format YYMMDDHHMMSS
         current_time = datetime.now().strftime(r"%Y%m%d_%H%M_%S")
 
@@ -352,8 +352,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                             self.run_command(clone_command)
 
                         # TODO: think about how the following is affected by different time zones and locales.
-                        git_log_command = f"cd {student_repo_path} && git log -1 --format='%cd,%an'" \
-                             " --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean"
+                        git_log_command = (f"cd {student_repo_path} && git log -1 --format='%cd,%an'"
+                             " --date=format-local:'%d/%m/%y,%H:%M:%S' src/assignment.lean")
                         git_log_result = self.run_command(git_log_command)
 
                         # Update or add the row in the DataFrame
@@ -440,16 +440,10 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 repo_path = Path(self.assignment_dir) / "student_repos" / student_repo_name
 
                 # Step 2: Run the lean command
-                result = subprocess.run(
-                    f"cd {repo_path} && lean .evaluate/evaluate.lean",
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    shell=True,
-                )
+                result = self.run_command(f"cd {repo_path} && lean .evaluate/evaluate.lean")
 
                 # Step 3: Check the output
-                if "sorry" not in result.stdout and "error" not in result.stdout:
+                if "sorry" not in result and "error" not in result:
                     grade = 100
                 else:
                     grade = 0
