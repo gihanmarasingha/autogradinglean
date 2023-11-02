@@ -52,9 +52,9 @@ class GitHubClassroomBase:
     _gh_api = 'gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28"'
 
     @staticmethod
-    def run_command(command):
+    def run_command(command, cwd=None):
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
-        result = subprocess.run(command, capture_output=True, text=True, shell=True, check=False)
+        result = subprocess.run(command, capture_output=True, text=True, shell=True, check=False, cwd=cwd)
         if result.returncode != 0:
             return None
         return result.stdout
@@ -194,7 +194,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             config = toml.load(config_file_path)
             return config
         except toml.TomlDecodeError as e:
+            self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to load configuration from %s: %s:", config_file_path, e)
+            self.logger.removeHandler(self.console_handler)
             return None
 
     def fetch_assignments(self):
@@ -208,7 +210,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             df_assignments = pd.DataFrame(assignments_data)
             return df_assignments
         except json.JSONDecodeError as e:
+            self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to decode JSON: %s", e)
+            self.logger.removeHandler(self.console_handler)
             return None
 
     def merge_student_data(self):
@@ -306,7 +310,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.starter_code_repository = assignment_data.get("starter_code_repository", {}).get("full_name")
             self.deadline = assignment_data.get("deadline")
         except json.JSONDecodeError as e:
-            self.logger.error("Failed to decode JSON %s", e)
+            self.logger.addHandler(self.console_handler)
+            self.logger.error("Failed to decode JSON: %s", e)
+            self.logger.removeHandler(self.console_handler)
             return None
         self.logger.info("Received assignment information")
 
@@ -324,7 +330,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         result = self.run_command(command)
 
         if result is None:
+            self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to get starter repository.")
+            self.logger.removeHandler(self.console_handler)
         else:
             self.logger.info("Retrieved starter repository.")
 
@@ -332,20 +340,24 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         """Get the mathlib cache for the starter repository"""
         starter_repo_path = Path(self.assignment_dir) / "starter_repo"
 
+        self.logger.addHandler(self.console_handler)
         self.logger.info("Getting mathlib for starter repo...")
+        try:
+            if starter_repo_path.exists():
+                # If the starter repo directory exists, run leanproject get-mathlib-cache
+                command = "leanproject get-mathlib-cache"
+                result = self.run_command(command, cwd=starter_repo_path)
 
-        if starter_repo_path.exists():
-            # If the starter repo directory exists, run leanproject get-mathlib-cache
-            command = f"cd {starter_repo_path} && leanproject get-mathlib-cache"
-
-            result = self.run_command(command)
-
-            if result is None:
-                self.logger.error("Failed to get mathlib cache for starter repository.")
+                if result is None:
+                    self.logger.error("Failed to get mathlib cache for starter repository.")              
+                else:
+                    self.logger.info("...successfully retrieved mathlib cache for starter repository.")
             else:
-                self.logger.info("...successfully retrieved mathlib cache for starter repository.")
-        else:
-            self.logger.warning("Starter repository does not exist. Please clone it first.")
+
+                self.logger.warning("Starter repository does not exist. Please clone it first.")
+
+        finally:
+            self.logger.removeHandler(self.console_handler)
 
     def get_student_repos(self):
         """Download the student repos for this assignment"""
@@ -431,7 +443,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 page += 1  # increment to fetch the next page
 
             except json.JSONDecodeError as e:
+                self.logger.addHandler(self.console_handler)
                 self.logger.error("Failed to decode JSON: %s", e)
+                self.logger.removeHandler(self.console_handler)
                 break
 
         pbar.close()
