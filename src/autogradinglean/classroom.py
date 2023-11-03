@@ -1,129 +1,22 @@
-"""Autograding with GitHub Classroom and Lean 3"""
+"""
+Representation of a GitHub Classroom
+"""
 import json
-import logging
 import os
-import re
 import subprocess
-import uuid
-from abc import ABC, abstractmethod
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 import toml
 from tqdm import tqdm  # for a progress bar
 
-###################################
-#
-# TODO: Speed up initialization of a GitHubAssignment object by only running fetch_assignment_info
-# when one of the GitHubAssignment's methods are called. Indeed, perhaps fetch_assignment_info
-# should be called anyway when running grading functions. The reason being that the assignment
-# data could change between runs.
-#
-#
-
-###################################
-#
-# This module performs all the interaction with GitHub, largely via the GitHub API.
-# Here is documenation on querying classrooms via the API:
-#
-#   https://docs.github.com/en/rest/classroom/classroom
-#
-# The current version of the module takes a simple approach, calling GitHub's `gh` CLI.
-# TODO: I plan to use the `PyGithub` package in the future. What I still need to understand is how to
-# perform authentication as a GitHub App.
-# Some useful reading is to be found at
-#
-#   https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/
-#       managing-private-keys-for-github-apps
-#
-# and at
-#
-#   https://pygithub.readthedocs.io/en/stable/examples/Authentication.html#app-authentication
-
+from .base import GitHubClassroomQueryBase
 
 # TODO: Document the methods that
-# 1) create grade sheets that merge the output of the autograder with the SITS data
 # 2) create outputs for mail merge:
 # 2.1) Write to sits candidates with no corresponding github username (classroom level)
 # 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct
 #       (classroom level)
-# 2.3) Write to all candidates (with a linked roster) with their grades and comments (assignment level)
-# 2.4) Output all accepted users who have not selected a student ID (assignment level)
-
-
-class GitHubClassroomBase:
-    """Provides methods to be used in derived classes for running subprocess and outputing query results"""
-
-    _ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-
-    @staticmethod
-    def run_command(command, cwd=None):
-        """Runs the specified command as a subprocess. Returns None on error or the stdout"""
-        result = subprocess.run(command, capture_output=True, text=True, shell=False, check=False, cwd=cwd)
-        if result.returncode != 0:
-            return None
-        return result.stdout
-
-    @staticmethod
-    def run_gh_api_command(command):
-        """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
-        we postprocess by removing ANSI escape codes."""
-        gh_api = ["gh","api", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"]
-        raw_ouput = GitHubClassroomBase.run_command([*gh_api, command])
-        return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
-
-
-class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
-    """Abstract base class for classes that output query results and performs logging"""
-    @property
-    @abstractmethod
-    def queries_dir(self):
-        """Wrapper for a property that specifies the directory for query output"""
-
-    def save_query_output(self, df_query_output, base_name, *, excel=False):
-        """Writes a dataframe as a CSV (default) or excel. The filename is formed from the basename and
-        the current date and time"""
-        # Generate the current date and time in the format YYMMDDHHMMSS
-        current_time = datetime.now(tz=timezone.utc).strftime(r"%Y%m%d_%H%M_%S")
-
-        # Create the filename
-        if excel:
-            filename = f"{base_name}{current_time}.xlsx"
-        else:
-            filename = f"{base_name}{current_time}.csv"
-
-        # Create the 'queries' subdirectory if it doesn't exist
-        self.queries_dir.mkdir(parents=True, exist_ok=True)
-
-        # Full path to the output file
-        file_path = self.queries_dir / filename
-
-        # Save the DataFrame to Excel
-        if excel:
-            df_query_output.to_excel(file_path, index=False)
-        else:
-            df_query_output.to_csv(file_path, index=False)
-
-    def _initialise_logger(self, logger_name, log_file):
-        logger = logging.getLogger(logger_name + uuid.uuid4().hex)
-        logger.setLevel(logging.INFO)
-
-        # Define a format for the log messages
-        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
-
-        # Create a file handler for writing to log file
-        file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-
-        # Create a console handler for output to stdout
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
-
-        return logger, file_handler, console_handler
 
 
 class GitHubClassroom(GitHubClassroomQueryBase):
@@ -147,7 +40,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     * student_id_col is the name of the column in 'filename' that gives the GitHub student identifiers,
     * output_cols is a list of 'filename' columns that should be output by certain queries.
     """
-    def __init__(self, marking_root_dir):
+    def __init__(self, marking_root_dir, *, debug = False):
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
         if not self.marking_root_dir.exists():
@@ -156,7 +49,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
         logger_name = "GitHubClassroom"
         log_file = self.marking_root_dir / "classroom.log"
-        self.logger, self.file_handler, self.console_handler = self._initialise_logger(logger_name, log_file)
+        self.debug = debug
+        self.logger, self.file_handler, self.console_handler = \
+            self._initialise_logger(logger_name, log_file, debug = self.debug)
 
         self.logger.info("Initializing classroom object")
         self._queries_dir = self.marking_root_dir / "query_output"
@@ -182,9 +77,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
         self.student_id_col = config["candidate_file"]["student_id_col"]
         self.output_cols = config["candidate_file"]["output_cols"]
-        self.df_sits_candidates[self.student_id_col] = (
-            self.df_sits_candidates[self.student_id_col].astype(int).astype(str).apply(lambda x: x.zfill(6))
-        )
+        # self.df_sits_candidates[self.student_id_col] = (
+        #     self.df_sits_candidates[self.student_id_col].astype(int).astype(str).apply(lambda x: x.zfill(6))
+        # )
         self.df_student_data = pd.DataFrame()
         self.assignments = []  # List to hold GitHubAssignment objects
         self.df_assignments = self.fetch_assignments()  # Fetch assignments on initialization
@@ -295,7 +190,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         self._queries_dir = self.assignment_dir / "query_output"
         logger_name = f"GitHubAssignment{self.id}"
         log_file = self.assignment_dir / f"assignment{self.id}.log"
-        self.logger, self.file_handler, self.console_handler = self._initialise_logger(logger_name, log_file)
+        self.logger, self.file_handler, self.console_handler = \
+            self._initialise_logger(logger_name, log_file, debug = parent_classroom.debug)
         # self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
 
@@ -642,20 +538,3 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             ["identifier", "github_username", *self.parent_classroom.output_cols, "student_repo_name"]
         ]
         self.save_query_output(df_no_commits, "no_commits", excel=True)
-
-
-class GitHubClassroomManager(GitHubClassroomBase):
-    """A class for representing all classrooms for the current user"""
-    def __init__(self):
-        self.df_classrooms = pd.DataFrame()
-        self.fetch_classrooms()
-
-    def fetch_classrooms(self):
-        """Get all classroom data"""
-        command = "/classrooms"
-        output = self.run_gh_api_command(command)
-        try:
-            classrooms_data = json.loads(output)
-            self.df_classrooms = pd.DataFrame(classrooms_data)
-        except json.JSONDecodeError as e:
-            logging.error("Failed to decode JSON: %s", e)
