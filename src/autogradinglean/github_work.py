@@ -19,7 +19,7 @@ from tqdm import tqdm  # for a progress bar
 # when one of the GitHubAssignment's methods are called. Indeed, perhaps fetch_assignment_info
 # should be called anyway when running grading functions. The reason being that the assignment
 # data could change between runs.
-# 
+#
 #
 
 ###################################
