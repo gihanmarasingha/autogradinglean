@@ -8,7 +8,6 @@ import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
-
 ###################################
 #
 # This module performs all the interaction with GitHub, largely via the GitHub API.

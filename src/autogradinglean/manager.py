@@ -6,6 +6,7 @@ import pandas as pd
 
 from .base import GitHubClassroomBase
 
+
 class GitHubClassroomManager(GitHubClassroomBase):
     """A class for representing all classrooms for the current user"""
     def __init__(self):
