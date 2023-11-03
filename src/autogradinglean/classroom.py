@@ -402,12 +402,14 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         commit_data_df = pd.read_csv(commit_data_file)
 
         self.logger.info("Autograding student repos...")
+        self.logger.debug("This is a debug message")
         pbar = tqdm(total=self.accepted, desc="Autograding student repos")
         # Loop through each student repo
         for _, row in commit_data_df.iterrows():
             commit_count = row.get("commit_count", 0)
             login = row["login"]
             student_repo_name = row["student_repo_name"]
+            self.logger.debug("Examining student repo %s", student_repo_name)
             # Check if this login exists in df_grades
             existing_row = df_grades.loc[df_grades["github_username"] == login]
 
@@ -461,6 +463,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                     existing_index = existing_row.index[0]
                     for key, value in new_row.items():
                         df_grades.at[existing_index, key] = value
+            else:
+                self.logger.debug("Repo %s not updated since last run. Not grading.", student_repo_name)
             pbar.update(1)
 
         pbar.close()

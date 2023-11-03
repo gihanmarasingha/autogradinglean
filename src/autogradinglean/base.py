@@ -83,23 +83,24 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
 
     def _initialise_logger(self, logger_name, log_file, *, debug = False):
         logger = logging.getLogger(logger_name + uuid.uuid4().hex)
-        if debug:
-            logger.setLevel(logging.DEBUG)
+        if debug is True:
+            logging_level = logging.DEBUG
         else:
-            logger.setLevel(logging.INFO)
+            logging_level = logging.INFO
+        logger.setLevel(logging_level)
 
         # Define a format for the log messages
         formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
         # Create a file handler for writing to log file
         file_handler = logging.FileHandler(log_file)
-        file_handler.setLevel(logging.INFO)
+        file_handler.setLevel(logging_level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
 
         # Create a console handler for output to stdout
         console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
+        console_handler.setLevel(logging_level)
         console_handler.setFormatter(formatter)
 
         return logger, file_handler, console_handler
