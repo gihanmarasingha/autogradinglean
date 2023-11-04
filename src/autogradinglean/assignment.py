@@ -57,7 +57,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to decode JSON: %s", e)
             self.logger.removeHandler(self.console_handler)
-            return None
         self.logger.info("Received assignment information")
 
     def get_starter_repo(self):
