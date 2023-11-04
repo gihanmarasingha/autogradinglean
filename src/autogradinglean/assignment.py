@@ -1,21 +1,18 @@
 """
 Representation of a GitHub Classroom
 """
+from __future__ import annotations
 # pylint: disable=fixme
 
 import json
 import os
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pandas as pd
 from tqdm import tqdm  # for a progress bar
 
 from autogradinglean.base import GitHubClassroomQueryBase
-
-if TYPE_CHECKING:
-    from .classroom import GitHubClassroom
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:

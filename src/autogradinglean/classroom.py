@@ -1,17 +1,15 @@
 """
 Representation of a GitHub Classroom
 """
+from __future__ import annotations
 import json
 from pathlib import Path
-from typing import List, TYPE_CHECKING
 
 import pandas as pd
 import toml
 
 from autogradinglean.base import GitHubClassroomQueryBase
 
-if TYPE_CHECKING:
-    from autograding.assignment import GitHubAssignment
 # pylint: disable=fixme
 
 # TODO: Document the methods that
@@ -43,7 +41,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     * output_cols is a list of 'filename' columns that should be output by certain queries.
     """
     def __init__(self, marking_root_dir, *, debug = False):
-        self.assignments: "List[GitHubAssignment]" = [] # List to hold GitHubAssignment objects
+        from autogradinglean.assignment import GitHubAssignment # pylint: disable=import-outside-toplevel
+        self.assignments: list[GitHubAssignment] = [] # List to hold GitHubAssignment objects
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
         if not self.marking_root_dir.exists():
