@@ -1,6 +1,8 @@
 """
 Representation of a GitHub Classroom
 """
+# pylint: disable=fixme
+
 import json
 import os
 import subprocess

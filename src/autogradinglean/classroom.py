@@ -12,6 +12,7 @@ from autogradinglean.base import GitHubClassroomQueryBase
 
 if TYPE_CHECKING:
     from autograding.assignment import GitHubAssignment
+# pylint: disable=fixme
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:
