@@ -2,14 +2,11 @@
 Representation of a GitHub Classroom
 """
 import json
-import os
-import subprocess
 from pathlib import Path
 from typing import List, TYPE_CHECKING
 
 import pandas as pd
 import toml
-from tqdm import tqdm  # for a progress bar
 
 from autogradinglean.base import GitHubClassroomQueryBase
 
@@ -152,7 +149,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
     def initialize_assignments(self):
         """Create a list of assignments"""
-        from .assignment import GitHubAssignment
+        from autogradinglean.assignment import GitHubAssignment # pylint: disable=import-outside-toplevel
         for _, row in self.df_assignments.iterrows():
             assignment_id = row["id"]
             new_assignment = GitHubAssignment(assignment_id, self)
