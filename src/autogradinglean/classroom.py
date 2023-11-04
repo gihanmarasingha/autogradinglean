@@ -10,7 +10,7 @@ import pandas as pd
 import toml
 from tqdm import tqdm  # for a progress bar
 
-from .base import GitHubClassroomQueryBase
+from autogradinglean.base import GitHubClassroomQueryBase
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:

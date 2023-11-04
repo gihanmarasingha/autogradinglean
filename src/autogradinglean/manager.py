@@ -4,7 +4,7 @@ import logging
 
 import pandas as pd
 
-from .base import GitHubClassroomBase
+from autogradinglean.base import GitHubClassroomBase
 
 
 class GitHubClassroomManager(GitHubClassroomBase):
