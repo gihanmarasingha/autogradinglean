@@ -87,6 +87,17 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.merge_student_data()
         self.initialize_assignments()  # Initialize GitHubAssignment objects
 
+    def run_command(self, command, cwd=None):
+        """Runs the specified command as a subprocess. Returns None on error or the stdout"""
+        self.logger.debug("Running command %s", command)
+        return GitHubClassroomQueryBase._run_command(command, cwd)
+
+    def run_gh_api_command(self, command):
+        """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
+        we postprocess by removing ANSI escape codes."""
+        self.logger.debug("Running command %s", command)
+        return GitHubClassroomQueryBase._run_gh_api_command(command)
+    
     @property
     def queries_dir(self):
         return self._queries_dir

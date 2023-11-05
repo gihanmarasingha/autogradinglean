@@ -22,7 +22,7 @@ from autogradinglean.base import GitHubClassroomQueryBase
 
 class GitHubAssignment(GitHubClassroomQueryBase):
     """Represents a GitHub assignment and provides methods for downloading repositories, autograding, etc."""
-    def __init__(self, assignment_id, parent_classroom: "GitHubClassroom"):
+    def __init__(self, assignment_id, parent_classroom: GitHubClassroom): # pylint: disable=undefined-variable
         self.id = assignment_id
         self.parent_classroom = parent_classroom  # Reference to the parent GitHubClassroom object
         self.assignment_dir = self.parent_classroom.marking_root_dir / f"assignment{self.id}"
@@ -35,6 +35,17 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self._initialise_logger(logger_name, log_file, debug = parent_classroom.debug)
         # self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
+
+    def run_command(self, command, cwd=None):
+        """Runs the specified command as a subprocess. Returns None on error or the stdout"""
+        self.logger.debug("Running command %s", command)
+        return GitHubClassroomQueryBase._run_command(command, cwd)
+
+    def run_gh_api_command(self, command):
+        """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
+        we postprocess by removing ANSI escape codes."""
+        self.logger.debug("Running command %s", command)
+        return GitHubClassroomQueryBase._run_gh_api_command(command)
 
     @property
     def queries_dir(self):
@@ -104,14 +115,17 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
     def get_student_repos(self):
         """Download the student repos for this assignment"""
+        
+        self.logger.info("Starting 'get_student_repos' function")
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
-
+        self.logger.debug("Trying to load commit data")
         commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
 
         # Initialize DataFrame to store commit data
         if commit_data_file.exists():
             commit_data_df = pd.read_csv(commit_data_file)
+            self.logger.debug("Loaded commit data")
         else:
             commit_data_df = pd.DataFrame(
                 columns=[
@@ -123,6 +137,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                     "last_commit_author",
                 ]
             )
+            self.logger.debug("No commit data. Creating empty dataframe.")
 
         page = 1
         per_page = 100  # max allowed value
@@ -131,7 +146,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         pbar = tqdm(total=self.accepted, desc="Getting student repos")
         while True:
             # Fetch accepted assignments from GitHub API
-            command = f"/assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}"
+            command = f"/assignments/{self.id}/accepted_assignments?page={page}per_page={per_page}"
             output = self.run_gh_api_command(command)
 
             try:
@@ -242,7 +257,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         commit_data_df = pd.read_csv(commit_data_file)
 
         self.logger.info("Autograding student repos...")
-        self.logger.debug("This is a debug message")
         pbar = tqdm(total=self.accepted, desc="Autograding student repos")
         # Loop through each student repo
         for _, row in commit_data_df.iterrows():

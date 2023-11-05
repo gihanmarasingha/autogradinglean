@@ -16,7 +16,7 @@ class GitHubClassroomManager(GitHubClassroomBase):
     def fetch_classrooms(self):
         """Get all classroom data"""
         command = "/classrooms"
-        output = self.run_gh_api_command(command)
+        output = self._run_gh_api_command(command)
         try:
             classrooms_data = json.loads(output)
             self.df_classrooms = pd.DataFrame(classrooms_data)
