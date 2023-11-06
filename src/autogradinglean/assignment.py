@@ -117,7 +117,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
     def get_student_repos(self):
         """Download the student repos for this assignment"""
-        
+
         self.logger.info("Starting 'get_student_repos' function")
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
