@@ -1,5 +1,5 @@
 """
-Representation of a GitHub Classroom
+Representation of a GitHub Assignment
 """
 from __future__ import annotations
 # pylint: disable=fixme
@@ -9,10 +9,12 @@ import os
 import subprocess
 from pathlib import Path
 
+
 import pandas as pd
 from tqdm import tqdm  # for a progress bar
 
 from autogradinglean.base import GitHubClassroomQueryBase
+from autogradinglean.classroom import GitHubClassroom
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:
@@ -22,7 +24,7 @@ from autogradinglean.base import GitHubClassroomQueryBase
 
 class GitHubAssignment(GitHubClassroomQueryBase):
     """Represents a GitHub assignment and provides methods for downloading repositories, autograding, etc."""
-    def __init__(self, assignment_id, parent_classroom: GitHubClassroom): # pylint: disable=undefined-variable
+    def __init__(self, assignment_id, parent_classroom: GitHubClassroom):
         self.id = assignment_id
         self.parent_classroom = parent_classroom  # Reference to the parent GitHubClassroom object
         self.assignment_dir = self.parent_classroom.marking_root_dir / f"assignment{self.id}"
