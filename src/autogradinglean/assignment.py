@@ -2,13 +2,12 @@
 Representation of a GitHub Assignment
 """
 from __future__ import annotations
-# pylint: disable=fixme
 
+# pylint: disable=fixme
 import json
 import os
 import subprocess
 from pathlib import Path
-
 
 import pandas as pd
 from tqdm import tqdm  # for a progress bar

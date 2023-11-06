@@ -2,6 +2,7 @@
 Representation of a GitHub Classroom
 """
 from __future__ import annotations
+
 import json
 from pathlib import Path
 
@@ -41,7 +42,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     * output_cols is a list of 'filename' columns that should be output by certain queries.
     """
     def __init__(self, marking_root_dir, *, debug = False):
-        from autogradinglean.assignment import GitHubAssignment # pylint: disable=import-outside-toplevel
+        from autogradinglean.assignment import GitHubAssignment  # pylint: disable=import-outside-toplevel
         self.assignments: list[GitHubAssignment] = [] # List to hold GitHubAssignment objects
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
@@ -97,7 +98,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         we postprocess by removing ANSI escape codes."""
         self.logger.debug("Running command %s", command)
         return GitHubClassroomQueryBase._run_gh_api_command(command)
-    
+
     @property
     def queries_dir(self):
         return self._queries_dir
@@ -160,7 +161,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
     def initialize_assignments(self):
         """Create a list of assignments"""
-        from autogradinglean.assignment import GitHubAssignment # pylint: disable=import-outside-toplevel
+        from autogradinglean.assignment import GitHubAssignment  # pylint: disable=import-outside-toplevel
         for _, row in self.df_assignments.iterrows():
             assignment_id = row["id"]
             new_assignment = GitHubAssignment(assignment_id, self)
