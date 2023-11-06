@@ -177,8 +177,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
                         # TODO: think about how the following is affected by different time zones and locales.
                         git_log_command = [
-                            "git", "log",  "-1",  r"--format='%cd,%an'",
-                            r"--date=format-local:'%d/%m/%y,%H:%M:%S'", r"src/assignment.lean"
+                            "git", "log",  "-1",  r"--format=%cd,%an",
+                            r"--date=format-local:%d/%m/%y,%H:%M:%S", r"src/assignment.lean"
                         ]
                         git_log_result = self.run_command(git_log_command, cwd=student_repo_path)
 
