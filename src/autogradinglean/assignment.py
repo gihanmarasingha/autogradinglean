@@ -91,22 +91,24 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         else:
             self.logger.info("Retrieved starter repository.")
 
-    def get_starter_repo_mathlib(self):
-        """Get the mathlib cache for the starter repository"""
+    def configure_starter_repo(self):
+        """
+        Configure the starter repository. This will download all dependencies.
+        """
         starter_repo_path = Path(self.assignment_dir) / "starter_repo"
 
         self.logger.addHandler(self.console_handler)
-        self.logger.info("Getting mathlib for starter repo...")
+        self.logger.info("Configuring the starter repo...")
         try:
             if starter_repo_path.exists():
-                # If the starter repo directory exists, run leanproject get-mathlib-cache
-                command = ["leanproject", "get-mathlib-cache"]
+                # If the starter repo directory exists, run leanpkg configure
+                command = ["leanpkg", "configure"]
                 result = self.run_command(command, cwd=starter_repo_path)
 
                 if result is None:
-                    self.logger.error("Failed to get mathlib cache for starter repository.")
+                    self.logger.error("Failed to configure the starter repository.")
                 else:
-                    self.logger.info("...successfully retrieved mathlib cache for starter repository.")
+                    self.logger.info("...successfully configured the starter repository.")
             else:
 
                 self.logger.warning("Starter repository does not exist. Please clone it first.")
@@ -214,7 +216,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         commit_data_df.to_csv(commit_data_file, index=False)
 
     def create_symlinks(self):
-        """Symlink the mathlib and leanpkg.path from the starter repo to the student repos"""
+        """Symlink the _target and leanpkg.path from the starter repo to the student repos"""
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         starter_repo_dir = Path(self.assignment_dir) / "starter_repo"
 
@@ -362,7 +364,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         self.logger.addHandler(self.console_handler)
         try:
             self.get_starter_repo()
-            self.get_starter_repo_mathlib()
+            self.configure_starter_repo()
             self.get_student_repos()
             self.create_symlinks()
             self.run_autograding()
