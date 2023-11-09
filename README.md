@@ -60,10 +60,58 @@ The classes are:
 Currently, the package interacts with GitHub Classroom primarily by creating subprocesses that run the GitHub's `gh`
 CLI with the classroom extension. This is why the [installation](#installation) instructions require `gh`.
 
+Primarily, I use `gh` together with the [Classroom REST API](https://docs.github.com/en/rest/classroom/classroom?apiVersion=2022-11-28).
+
 
 ## GitHubClassroomManager
 
+This is a simple wrapper around the `/classrooms` REST API call. It has only one property, `df_classrooms`. This
+is a Pandas DataFrame of the GitHub classrooms for the current user.
+
+Example use:
+```
+from autogradinglean import GitHubClassroomManager
+
+rooms = GitHubClassroomManager()
+rooms.df_classrooms
+```
+
+This is especially useful as it returns the list of classroom IDs for each classroom. These are needed for use
+with the GitHubClassroom class.
+
+### Limitations
+
+Currently the code is limited to returning at most 30 classrooms.
+
 ## GitHubClassroom
+
+This class represents a GitHub Classroom and the sets of candidates from your student record system.
+
+You must supply a 'classroom directory' as an argument to the constructor. In the root of this directory, there must
+be a file `config.toml`. Here is a sample config file:
+
+    classroom_id = "999999"
+    classroom_roster_csv = "classroom_roster.csv"
+
+    [candidate_file]
+    filename = "STUDENT_DATA.csv"
+    student_id_col = "Candidate No"
+    output_cols = ["Forename", "Surname", "Email Address"]
+
+* `classroom_id` is the identifier of the classroom, as returned by GitHubClassroomManager.
+* `classroom_roster_csv` is the name of the csv file containing the GitHub Classroom roster for this classroom. At
+  present, there is no API for downloading this file. You must download it manually from GitHub Classroom.
+  The filename can include a path, relative to the classroom directory root.
+* `filename` is the name of a csv file containing information about your students, extracted from your student record
+  system. There is no required format to this file except that it must contain a column that corresponds to the
+  student identifiers of the GitHub Classroom roster. As with the `classroom_roster_csv`, the filename can include a
+  path relative to the classroom directory root.
+* `student_id_col` is the name of the column in your student data file that corresponds to the student identifier in 
+  the GitHub Classroom roster.
+* `output_cols` are the names of other columes in the student data file that should be included in the reporting
+  methods of GitHubClassroom.
+
+
 
 ## GitHubAssignment
 
