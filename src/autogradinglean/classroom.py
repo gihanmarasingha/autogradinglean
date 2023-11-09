@@ -123,6 +123,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         try:
             assignments_data = json.loads(output)
             df_assignments = pd.DataFrame(assignments_data)
+            self.save_query_output(df_assignments, "assignments")
             return df_assignments
         except json.JSONDecodeError as e:
             self.logger.addHandler(self.console_handler)
