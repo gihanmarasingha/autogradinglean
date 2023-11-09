@@ -15,7 +15,7 @@ from autogradinglean.base import GitHubClassroomQueryBase
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:
-# 2.1) Write to sits candidates with no corresponding github username (classroom level)
+# 2.1) Write to candidates with no corresponding github username (classroom level)
 # 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct
 #       (classroom level)
 
@@ -31,14 +31,14 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
         [candidate_file]
         filename = "mth9999.csv"
-        student_id_col = "Candidate No"
+        candidate_id_col = "Candidate No"
         output_cols = ["Forename", "Surname", "Email Address"]
 
     Above,
     * classroom_id is the GitHub classroom id (which can be found via a GitHutClassrooms object),
     * classrooom_roster_csv is the name of the file downloaded from GitHub Classroom,
     * filename is the name of a CSV file containing student data from your institution's record system,
-    * student_id_col is the name of the column in 'filename' that gives the GitHub student identifiers,
+    * candidate_id_col is the name of the column in 'filename' that gives the GitHub student identifiers,
     * output_cols is a list of 'filename' columns that should be output by certain queries.
     """
     def __init__(self, marking_root_dir, *, debug = False):
@@ -48,22 +48,20 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         if not self.marking_root_dir.exists():
             msg = f"The specified marking_root_dir '{self.marking_root_dir}' does not exist."
             raise FileNotFoundError(msg)
-        
+
         logger_name = "GitHubClassroom"
         log_file = self.marking_root_dir / "classroom.log"
         self.debug = debug
         self.logger, self.file_handler, self.console_handler = \
             self._initialise_logger(logger_name, log_file, debug = self.debug)
-
-        self.id = self.df_classroom_roster = self.df_sits_candidates = self.student_id_col = self.output_cols = None
-        self.get_data_from_config_file()
-
-        self.logger.info("Initializing classroom object")
-        self._queries_dir = self.marking_root_dir / "query_output"
-
+        
+        self.id = self.df_classroom_roster = self.df_candidates = self.candidate_id_col = self.output_cols = None
         self.df_student_data = pd.DataFrame()
+
+        self._queries_dir = self.marking_root_dir / "query_output"
+        self.get_data_from_config_file()
         self._df_assignments = self._fetch_assignments()  # Fetch assignments on initialization
-        self.merge_student_data()
+
         self._initialize_assignments()  # Initialize GitHubAssignment objects
 
     def get_data_from_config_file(self):
@@ -80,13 +78,14 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.id = config["classroom_id"]
 
         classroom_roster_csv = self.marking_root_dir / config["classroom_roster_csv"]
-        sits_candidate_file = self.marking_root_dir / config["candidate_file"]["filename"]
+        candidate_file = self.marking_root_dir / config["candidate_file"]["filename"]
 
         self.df_classroom_roster = pd.read_csv(classroom_roster_csv, dtype=object)
-        self.df_sits_candidates = pd.read_csv(sits_candidate_file, dtype=object)
+        self.df_candidates = pd.read_csv(candidate_file, dtype=object)
 
-        self.student_id_col = config["candidate_file"]["student_id_col"]
+        self.candidate_id_col = config["candidate_file"]["candidate_id_col"]
         self.output_cols = config["candidate_file"]["output_cols"]
+        self._merge_student_data()
 
     def list_assignments(self):
         """Returns the Pandas DataFrame of assignment data"""
@@ -125,7 +124,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             return None
 
     def _fetch_assignments(self):
-        """Gets a table of dataframe of assignments for this classroom"""
+        """Gets a dataframe of assignments for this classroom"""
         self.logger.info("Fetching assignments from GitHub")
         command = f"/classrooms/{self.id}/assignments"
         output = self._run_gh_api_command(command)
@@ -141,29 +140,17 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             self.logger.removeHandler(self.console_handler)
             return None
 
-    def merge_student_data(self):
+    def _merge_student_data(self):
         """Merges candidate data from a GitHub Classroom classroom roster CSV file and a CSV file
-        extracted from SITS.
-
-        The columns of the classroom roster should be:
-
-            'identifier', 'github_username', 'github_id', 'name'
-
-        The 'identifier' should correspond with the student_id_col from the SITS spreadsheet.
+        extracted from the student record system.
         """
-        # The classroom roster and SITS data are already stored in the object
+        # The classroom roster and student record system data are already stored in the object
         df_classroom_roster = self.df_classroom_roster
-        df_sits_candidates = self.df_sits_candidates
+        df_candidates = self.df_candidates
 
         self.df_student_data = pd.merge(
-            df_classroom_roster, df_sits_candidates, left_on="identifier", right_on=self.student_id_col, how="outer"
+            df_classroom_roster, df_candidates, left_on="identifier", right_on=self.candidate_id_col, how="outer"
         )
-
-    # def update_classroom_roster(self, new_classroom_roster_csv):
-    #     self.df_classroom_roster = pd.read_csv(new_classroom_roster_csv, dtype=object)
-
-    # def update_sits_candidates(self, new_sits_candidate_file):
-    #     self.df_sits_candidates = pd.read_excel(new_sits_candidate_file, dtype=object)
 
     def _initialize_assignments(self):
         """Create a list of assignments"""
@@ -174,26 +161,37 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             self.assignments[assignment_id] = new_assignment
 
     def find_missing_roster_identifiers(self):
-        """Returns those students who appear in the SITS data but not in the classroom roster. This typically
-        indicates students who enrolled since the last update of the roster. The instructor should manually
-        adjust the classroom roster on GitHub and then update the local classroom roster."""
-        # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
-        unmatched_candidates = self.df_student_data[self.df_student_data["identifier"].isna()]
+        """
+        Returns those students who appear in the student record system data but not in the classroom roster. This
+        typically indicates students who enrolled since the last update of the roster.
+        
+        The instructor should manually adjust the classroom roster on GitHub and then update the local classroom roster.
+        """
+        # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
         self.logger.info("Finding missing roster identifiers")
-        return unmatched_candidates
+        mask = self.df_student_data["identifier"].isna()
+        missing_roster_ids = self.df_student_data.loc[mask, [self.candidate_id_col, *self.output_cols]]
+        self.save_query_output(missing_roster_ids, "missing_roster_ids", excel=True)
+        return missing_roster_ids
 
     def find_missing_candidates(self):
-        """Returns those students on the classroom roster who are not in the SITS data. This typically
-        indicates students who have unenrolled from the course. The instructor can either (1) manually update
-        the GitHub classroom roster to remove those identifers and then update the local classroom roster or
-        (2) just ignore the issue"""
-        # Rows where 'identifier' is NaN will be the ones that are in df_sits_candidates but not in df_classroom_roster
-        unmatched_candidates = self.df_student_data[self.df_student_data[self.student_id_col].isna()]
-        return unmatched_candidates
+        """
+        Returns those students on the classroom roster who are not in the student record system data. This typically
+        indicates students who have unenrolled from the course.
+        
+        The instructor can either:
+        (1) manually update the GitHub classroom roster to remove those identifers and then update the local classroom
+            roster or
+        (2) just ignore the issue
+        """
+        # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
+        missing_candidates = self.df_student_data[self.df_student_data[self.candidate_id_col].isna()]
+        return missing_candidates
 
     def find_unlinked_candidates(self):
         """Returns those candidates who have not linked their GitHub account with the roster"""
-        mask = self.df_student_data["github_username"].isna() & self.df_student_data[self.student_id_col].notna()
-        unlinked_candidates = self.df_student_data.loc[mask, [self.student_id_col, *self.output_cols]]
+        mask = self.df_student_data["github_username"].isna() & self.df_student_data[self.candidate_id_col].notna()
+        unlinked_candidates = self.df_student_data.loc[mask, [self.candidate_id_col, *self.output_cols]]
         self.logger.info("Finding unlinked candidates")
         self.save_query_output(unlinked_candidates, "unlinked_candidates", excel=True)
+        return unlinked_candidates

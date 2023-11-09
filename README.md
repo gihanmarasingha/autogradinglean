@@ -39,16 +39,16 @@ This package consists of several classes that represent aspects of GitHub Classr
 your student record system, prepare reports on Classroom-level and assignment-level data, perform local autograding,
 and enable annotation with manual marks and comments.
 
-In this document, I use the term 'candidate' for a student as identified by your student record system and 'student'
-for the corresponding entity on GitHub Classroom. Ideally, there should be a natural one-to-one mapping from
-candidates to students! This package helps to establish such a mapping.
+In this document, I use the term 'candidate' or 'candidate number' for the identifier of a student on your institution's
+student record system and 'roster identifier' for the corresponding entity in GitHub Classroom. Ideally, there should be
+a natural one-to-one mapping from candidates to roster identifiers! This package helps to establish such a mapping.
 
 The classes are:
 
 * GitHubClassroomManger: used primarily to list the classrooms owned by the current user.
 * GitHubClassroom: the main class you'll interact with. It represents your (academic) class in two ways: via the
-  GitHub Classroom roster and via student data imported from your student record system. It can report on
-  'unlinked candidates': those candidates for whom there is no link between their student identifier at their
+  GitHub Classroom roster and via candidate data imported from your student record system. It can report on
+  'unlinked candidates': those candidates for whom there is no link between their roster identifier and their
   GitHub username. It can also find candidates who have enrolled (or unenrolled) since you set up the roster.
 
   This is also a container class, containing one GitHubAssignment object per assignment.
@@ -97,7 +97,7 @@ be a file `config.toml`. Here is a sample config file:
 
     [candidate_file]
     filename = "STUDENT_DATA.csv"
-    student_id_col = "Candidate No"
+    candidate_id_col = "Candidate No"
     output_cols = ["Forename", "Surname", "Email Address"]
 
 * `classroom_id` is the identifier of the classroom, as returned by GitHubClassroomManager.
@@ -108,15 +108,43 @@ be a file `config.toml`. Here is a sample config file:
   system. There is no required format to this file except that it must contain a column that corresponds to the
   student identifiers of the GitHub Classroom roster. As with the `classroom_roster_csv`, the filename can include a
   path relative to the classroom directory root.
-* `student_id_col` is the name of the column in your student data file that corresponds to the student identifier in 
+* `candidate_id_col` is the name of the column in your student data file that corresponds to the roster identifier in 
   the GitHub Classroom roster.
 * `output_cols` are the names of other columes in the student data file that should be included in the reporting
   methods of GitHubClassroom.
 
 ### Methods
 
-* list_assignments: returns a table (a Pandas DataFrame) of assigments for this classroom.
-* 
+* list_assignments(): returns a table (a Pandas DataFrame) of assigments for this classroom.
+* get_data_from_config_file(): reads the configuration file and imports the referenced data from the GitHub Classroom
+  roster and from your student record system. This method is called automatically on initialisation of a
+  GitHubClassroom object. You *should* also call the method if your config file or any of the referenced data files
+  change.
+* get_assignment_by_title(ass_title): returns a GitHubAssignment whose title is ass_title. It is preferable to use
+  assignment IDs rather than titles as titles can be changed.
+* find_missing_roster_identifiers(): returns a DataFrame of those students who are in the candidate file but not in
+  in the classroom roster. This usually indicates students who have enrolled since the roster was last updated.
+
+  **Action**: the instructor must update the classroom roster and (if relevant) ask these candidate to choose their
+  roster identifier on GitHub Classroom.
+* find_missing_candidates(): returns a DataFrame of those students who are in the classroom roster but not in the
+  candidate file. This generally identifies students who have been unenrolled by your institution, but have not been
+  removed from the classroom roster. Usually no action is required.
+* find_unlinked_candidates(): returns those candidates who have not linked their GitHub account with the roster.
+
+  **Action**: ask these candidates to choose their roster identifier on GitHub.
+
+### Query output
+
+Many of the methods create CSV or Excel files that are stored in the `query_output` subdirectory, with a date and
+time suffix to the filename. These can be safely edited or deleted as desired.
+
+* assignmentsXXX.csv: a list of all assignments in the classroom. This is the data downloaded from GitHub Classroom and
+  shows the assignment IDs, title, invite link, deadline, number of accepted students, number of submissions, number of
+  passing students, and other data. This file is created each time the GitHubClassroom object is initialised.
+* missing_roster_idsXXX.xlsx: created by find_missing_roster_identifiers(). Shows the candidate number and the values
+  from the columns listed in output_cols.
+* **COMPLETE THIS**.
 
 ## GitHubAssignment
 

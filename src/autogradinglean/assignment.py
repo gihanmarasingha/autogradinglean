@@ -17,7 +17,7 @@ from autogradinglean.classroom import GitHubClassroom
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:
-# 2.1) Write to sits candidates with no corresponding github username (classroom level)
+# 2.1) Write to candidates with no corresponding github username (classroom level)
 # 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct
 #       (classroom level)
 
@@ -342,7 +342,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         # Filter student data
         df_student_data_filtered = self.parent_classroom.df_student_data[
-            ~self.parent_classroom.df_student_data[self.parent_classroom.student_id_col].isna()
+            ~self.parent_classroom.df_student_data[self.parent_classroom.candidate_id_col].isna()
         ]
 
         # Merge the dataframes
