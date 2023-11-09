@@ -42,8 +42,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     * output_cols is a list of 'filename' columns that should be output by certain queries.
     """
     def __init__(self, marking_root_dir, *, debug = False):
-        from autogradinglean.assignment import GitHubAssignment  # pylint: disable=import-outside-toplevel
-        self.assignments: list[GitHubAssignment] = [] # List to hold GitHubAssignment objects
+        self.assignments = {} # Dictionary to hold GitHubAssignment objects
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
         if not self.marking_root_dir.exists():
@@ -84,9 +83,13 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         #     self.df_sits_candidates[self.student_id_col].astype(int).astype(str).apply(lambda x: x.zfill(6))
         # )
         self.df_student_data = pd.DataFrame()
-        self.df_assignments = self.fetch_assignments()  # Fetch assignments on initialization
+        self._df_assignments = self.fetch_assignments()  # Fetch assignments on initialization
         self.merge_student_data()
         self.initialize_assignments()  # Initialize GitHubAssignment objects
+
+    def list_assignments(self):
+        """Returns the Pandas DataFrame of assignment data"""
+        return self._df_assignments
 
     def run_command(self, command, cwd=None):
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
@@ -98,6 +101,12 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         we postprocess by removing ANSI escape codes."""
         self.logger.debug("Running command %s", command)
         return GitHubClassroomQueryBase._run_gh_api_command(command)
+
+    def get_assignment_by_title(self, title):
+        """Returns the first assignment with the given title (if it exists)"""
+        ids =self._df_assignments[self._df_assignments['title']==title]['id']
+        self.logger.debug("Trying to get assignment titled %s", title)
+        return self.assignments[ids.iloc[0]]
 
     @property
     def queries_dir(self):
@@ -163,10 +172,10 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     def initialize_assignments(self):
         """Create a list of assignments"""
         from autogradinglean.assignment import GitHubAssignment  # pylint: disable=import-outside-toplevel
-        for _, row in self.df_assignments.iterrows():
+        for _, row in self._df_assignments.iterrows():
             assignment_id = row["id"]
             new_assignment = GitHubAssignment(assignment_id, self)
-            self.assignments.append(new_assignment)
+            self.assignments[assignment_id] = new_assignment
 
     def find_missing_roster_identifiers(self):
         """Returns those students who appear in the SITS data but not in the classroom roster. This typically
