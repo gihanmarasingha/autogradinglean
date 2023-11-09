@@ -48,21 +48,30 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         if not self.marking_root_dir.exists():
             msg = f"The specified marking_root_dir '{self.marking_root_dir}' does not exist."
             raise FileNotFoundError(msg)
-
+        
         logger_name = "GitHubClassroom"
         log_file = self.marking_root_dir / "classroom.log"
         self.debug = debug
         self.logger, self.file_handler, self.console_handler = \
             self._initialise_logger(logger_name, log_file, debug = self.debug)
 
+        self.id = self.df_classroom_roster = self.df_sits_candidates = self.student_id_col = self.output_cols = None
+        self.get_data_from_config_file()
+
         self.logger.info("Initializing classroom object")
         self._queries_dir = self.marking_root_dir / "query_output"
 
-        # Load configuration from TOML file
+        self.df_student_data = pd.DataFrame()
+        self._df_assignments = self._fetch_assignments()  # Fetch assignments on initialization
+        self.merge_student_data()
+        self._initialize_assignments()  # Initialize GitHubAssignment objects
+
+    def get_data_from_config_file(self):
+        """Read config file and associated data"""
 
         self.logger.info("Reading config.toml file")
         config_file_path = self.marking_root_dir / "config.toml"
-        config = self.load_config_from_toml(config_file_path)
+        config = self._load_config_from_toml(config_file_path)
 
         if config is None:
             msg = "Failed to load configuration. Initialization aborted."
@@ -70,22 +79,14 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             raise RuntimeError(msg)
         self.id = config["classroom_id"]
 
-        # Make paths in TOML relative to marking_root_dir
-        self.classroom_roster_csv = self.marking_root_dir / config["classroom_roster_csv"]
-        self.sits_candidate_file = self.marking_root_dir / config["candidate_file"]["filename"]
+        classroom_roster_csv = self.marking_root_dir / config["classroom_roster_csv"]
+        sits_candidate_file = self.marking_root_dir / config["candidate_file"]["filename"]
 
-        self.df_classroom_roster = pd.read_csv(self.classroom_roster_csv, dtype=object)
-        self.df_sits_candidates = pd.read_csv(self.sits_candidate_file, dtype=object)
+        self.df_classroom_roster = pd.read_csv(classroom_roster_csv, dtype=object)
+        self.df_sits_candidates = pd.read_csv(sits_candidate_file, dtype=object)
 
         self.student_id_col = config["candidate_file"]["student_id_col"]
         self.output_cols = config["candidate_file"]["output_cols"]
-        # self.df_sits_candidates[self.student_id_col] = (
-        #     self.df_sits_candidates[self.student_id_col].astype(int).astype(str).apply(lambda x: x.zfill(6))
-        # )
-        self.df_student_data = pd.DataFrame()
-        self._df_assignments = self.fetch_assignments()  # Fetch assignments on initialization
-        self.merge_student_data()
-        self.initialize_assignments()  # Initialize GitHubAssignment objects
 
     def list_assignments(self):
         """Returns the Pandas DataFrame of assignment data"""
@@ -112,7 +113,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     def queries_dir(self):
         return self._queries_dir
 
-    def load_config_from_toml(self,config_file_path):
+    def _load_config_from_toml(self,config_file_path):
         """Loads data from a toml file"""
         try:
             config = toml.load(config_file_path)
@@ -123,7 +124,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             self.logger.removeHandler(self.console_handler)
             return None
 
-    def fetch_assignments(self):
+    def _fetch_assignments(self):
         """Gets a table of dataframe of assignments for this classroom"""
         self.logger.info("Fetching assignments from GitHub")
         command = f"/classrooms/{self.id}/assignments"
@@ -158,18 +159,13 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             df_classroom_roster, df_sits_candidates, left_on="identifier", right_on=self.student_id_col, how="outer"
         )
 
-        # file_path = self.marking_root_dir / 'student_data.csv'
-
-        # Save the DataFrame to a CSV file
-        # self.df_student_data.to_csv(file_path, index=False)
-
     # def update_classroom_roster(self, new_classroom_roster_csv):
     #     self.df_classroom_roster = pd.read_csv(new_classroom_roster_csv, dtype=object)
 
     # def update_sits_candidates(self, new_sits_candidate_file):
     #     self.df_sits_candidates = pd.read_excel(new_sits_candidate_file, dtype=object)
 
-    def initialize_assignments(self):
+    def _initialize_assignments(self):
         """Create a list of assignments"""
         from autogradinglean.assignment import GitHubAssignment  # pylint: disable=import-outside-toplevel
         for _, row in self._df_assignments.iterrows():
