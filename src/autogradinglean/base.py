@@ -35,7 +35,7 @@ class GitHubClassroomBase:
     _ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
     @staticmethod
-    def _run_command(command, cwd=None):
+    def _run_command_base(command, cwd=None):
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
         result = subprocess.run(command, capture_output=True, text=True, shell=False, check=False, cwd=cwd)
         if result.returncode != 0:
@@ -43,11 +43,11 @@ class GitHubClassroomBase:
         return result.stdout
 
     @staticmethod
-    def _run_gh_api_command(command):
+    def _run_gh_api_command_base(command):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
         gh_api = ["gh","api", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"]
-        raw_ouput = GitHubClassroomBase._run_command([*gh_api, command])
+        raw_ouput = GitHubClassroomBase._run_command_base([*gh_api, command])
         return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
 
 

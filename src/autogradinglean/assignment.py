@@ -37,16 +37,16 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         # self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
 
-    def run_command(self, command, cwd=None):
+    def _run_command(self, command, cwd=None):
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
         self.logger.debug("Running command %s", command)
-        return GitHubClassroomQueryBase._run_command(command, cwd)
+        return GitHubClassroomQueryBase._run_command_base(command, cwd)
 
-    def run_gh_api_command(self, command):
+    def _run_gh_api_command(self, command):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
         self.logger.debug("Running command %s", command)
-        return GitHubClassroomQueryBase._run_gh_api_command(command)
+        return GitHubClassroomQueryBase._run_gh_api_command_base(command)
 
     @property
     def queries_dir(self):
@@ -55,7 +55,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
     def fetch_assignment_info(self):
         """Gets information about this assignment."""
         command = f"/assignments/{self.id}"
-        output = self.run_gh_api_command(command)
+        output = self._run_gh_api_command(command)
 
         try:
             assignment_data = json.loads(output)
@@ -82,7 +82,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             # Otherwise, clone the starter repo
             command, cwd = (["gh", "repo", "clone", f"{self.starter_code_repository}", f"{starter_repo_path}"]), None
 
-        result = self.run_command(command, cwd)
+        result = self._run_command(command, cwd)
 
         if result is None:
             self.logger.addHandler(self.console_handler)
@@ -103,7 +103,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             if starter_repo_path.exists():
                 # If the starter repo directory exists, run leanpkg configure
                 command = ["leanpkg", "configure"]
-                result = self.run_command(command, cwd=starter_repo_path)
+                result = self._run_command(command, cwd=starter_repo_path)
 
                 if result is None:
                     self.logger.error("Failed to configure the starter repository.")
@@ -150,7 +150,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         while True:
             # Fetch accepted assignments from GitHub API
             command = f"/assignments/{self.id}/accepted_assignments?page={page}per_page={per_page}"
-            output = self.run_gh_api_command(command)
+            output = self._run_gh_api_command(command)
 
             try:
                 accepted_assignments = json.loads(output)
@@ -172,18 +172,18 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                         if student_repo_path.exists():
                             # Pull the repo
                             pull_command = ["git", "pull"]
-                            self.run_command(pull_command, cwd=student_repo_path)
+                            self._run_command(pull_command, cwd=student_repo_path)
                         else:
                             # Clone the repo
                             clone_command = ["git", "clone", f"{repo_info.get('html_url', '')}", f"{student_repo_path}"]
-                            self.run_command(clone_command)
+                            self._run_command(clone_command)
 
                         # TODO: think about how the following is affected by different time zones and locales.
                         git_log_command = [
                             "git", "log",  "-1",  r"--format=%cd,%an",
                             r"--date=format-local:%d/%m/%y,%H:%M:%S", r"src/assignment.lean"
                         ]
-                        git_log_result = self.run_command(git_log_command, cwd=student_repo_path)
+                        git_log_result = self._run_command(git_log_command, cwd=student_repo_path)
 
                         # Update or add the row in the DataFrame
                         new_row = {

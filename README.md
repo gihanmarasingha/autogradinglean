@@ -87,6 +87,8 @@ Currently the code is limited to returning at most 30 classrooms.
 
 This class represents a GitHub Classroom and the sets of candidates from your student record system.
 
+### Configuration file
+
 You must supply a 'classroom directory' as an argument to the constructor. In the root of this directory, there must
 be a file `config.toml`. Here is a sample config file:
 
@@ -111,7 +113,10 @@ be a file `config.toml`. Here is a sample config file:
 * `output_cols` are the names of other columes in the student data file that should be included in the reporting
   methods of GitHubClassroom.
 
+### Methods
 
+* list_assignments: returns a table (a Pandas DataFrame) of assigments for this classroom.
+* 
 
 ## GitHubAssignment
 
