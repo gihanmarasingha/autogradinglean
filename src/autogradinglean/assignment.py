@@ -11,6 +11,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import toml
 import pandas as pd
 from tqdm import tqdm  # for a progress bar
 
@@ -98,6 +99,23 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         else:
             self.logger.info("Retrieved starter repository.")
 
+    def _get_mathlib(self, starter_repo_path):
+        self.logger.debug("Testing if mathlib is a dependency")
+        leanpkgtoml_path = starter_repo_path / 'leanpkg.toml'
+        leanpkgtoml = toml.load(leanpkgtoml_path)
+        if 'dependencies' in leanpkgtoml:
+            if 'mathlib' in leanpkgtoml['dependencies']:
+                self.logger.info("Getting mathlib cache for stater repo...")
+                command = ["leanproject", "get-mathlib-cache"]
+                result = self._run_command(command, cwd=starter_repo_path)
+
+                if result is None:
+                    self.logger.error("Failed to get mathlib")
+                else:
+                    self.logger.info("...successfully retrieved mathlib cache")
+            return
+        self.logger.debug("Mathlib is not a dependency")
+
     def configure_starter_repo(self):
         """
         Configure the starter repository. This will download all dependencies.
@@ -111,11 +129,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 # If the starter repo directory exists, run leanpkg configure
                 command = ["leanpkg", "configure"]
                 result = self._run_command(command, cwd=starter_repo_path)
-
                 if result is None:
                     self.logger.error("Failed to configure the starter repository.")
                 else:
                     self.logger.info("...successfully configured the starter repository.")
+                self._get_mathlib(starter_repo_path)
             else:
                 self.logger.warning("Starter repository does not exist. Please clone it first.")
 
