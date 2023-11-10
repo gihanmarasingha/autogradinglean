@@ -2,11 +2,13 @@
 Representation of a GitHub Assignment
 """
 from __future__ import annotations
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # pylint: disable=fixme
 import json
 import os
 import subprocess
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -46,7 +48,12 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
         self.logger.debug("Running command %s", command)
-        return GitHubClassroomQueryBase._run_gh_api_command_base(command)
+        try:
+            result = GitHubClassroomQueryBase._run_gh_api_command_base(command)
+            return result
+        except TypeError as e:
+            self.logger.debug("Encountered TypeError %s", e)
+            return None
 
     @property
     def queries_dir(self):
@@ -116,15 +123,10 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         finally:
             self.logger.removeHandler(self.console_handler)
 
-    def get_student_repos(self):
-        """Download the student repos for this assignment"""
-
-        self.logger.info("Starting 'get_student_repos' function")
-        student_repos_dir = Path(self.assignment_dir) / "student_repos"
-        student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
-        self.logger.debug("Trying to load commit data")
-        commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
-
+    def _read_commit_data(self, commit_data_file):
+        """
+        Read (or create if it doesn't exist) the commit_data.csv file
+        """
         # Initialize DataFrame to store commit data
         if commit_data_file.exists():
             commit_data_df = pd.read_csv(commit_data_file)
@@ -141,67 +143,120 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 ]
             )
             self.logger.debug("No commit data. Creating empty dataframe.")
+        return commit_data_df
+
+    def _get_student_repo(self, submission, student_repos_dir, commit_data_df, pbar):
+        """
+        Get a single student repository
+        """
+        repo_info = submission.get("repository", {})
+        repo_full_name = repo_info.get("full_name", "")
+        student_repo_name = repo_full_name.split("/")[-1]
+        student_repo_path = student_repos_dir / student_repo_name
+        login = submission["students"][0]["login"]
+        new_commit_count = submission.get("commit_count", 0)
+
+        self.logger.debug("Considering student repository: %s", student_repo_name)
+
+        # Check if this repo is already in the DataFrame
+        existing_row = commit_data_df.loc[commit_data_df["student_repo_name"] == student_repo_name]
+        if existing_row.empty or existing_row.iloc[0]["commit_count"] < new_commit_count:
+            self.logger.debug("Repo %s not already in commit data file", student_repo_name)
+            # Logic to clone or pull the repo
+            if student_repo_path.exists():
+                # Pull the repo
+                pull_command = ["git", "pull"]
+                self._run_command(pull_command, cwd=student_repo_path)
+            else:
+                # Clone the repo
+                clone_command = ["git", "clone", f"{repo_info.get('html_url', '')}", f"{student_repo_path}"]
+                self._run_command(clone_command)
+
+            # TODO: think about how the following is affected by different time zones and locales.
+            git_log_command = [
+                "git", "log",  "-1",  r"--format=%cd,%an",
+                r"--date=format-local:%d/%m/%y,%H:%M:%S", r"src/assignment.lean"
+            ]
+            git_log_result = self._run_command(git_log_command, cwd=student_repo_path)
+
+            # Update or add the row in the DataFrame
+            new_row = {
+                "student_repo_name": student_repo_name,
+                "login": login,
+                "commit_count": new_commit_count,
+            }
+
+            if git_log_result:
+                last_commit_date, last_commit_time, last_commit_author = git_log_result.strip().split(",")
+                new_row["last_commit_date"] = last_commit_date
+                new_row["last_commit_time"] = last_commit_time
+                new_row["last_commit_author"] = last_commit_author
+
+            pbar.update(1)
+            return new_row
+            # commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
+        else:
+            pbar.update(1)
+            return None
+        
+    def _get_page(self, page, per_page):
+        """
+        Get a page of submissions.
+
+        Due to GitHub API rate limitingm, if the call to `_run_gh_api_command` fails, we should wait and try again
+
+        TODO:
+        * incorporate this into the `_run_gh_api_command` function (and get rid of this function).
+        * deal with rate limiting more intelligently.
+        """
+        self.logger.debug("Getting submissions page %s, with %s submissions per page", page, per_page)
+        command = f"/assignments/{self.id}/accepted_assignments?page={page}per_page={per_page}"
+
+        for _ in range(3):  # Retry up to 3 times
+            output = self._run_gh_api_command(command)
+            if output is not None:
+                return output
+            time.sleep(4)  # Wait for 4 seconds before retrying
+        return None # Could not get the page after 3 attempts
+
+    def get_student_repos(self):
+        """Download the student repos for this assignment"""
+
+        self.logger.info("Starting 'get_student_repos' function")
+        student_repos_dir = Path(self.assignment_dir) / "student_repos"
+        student_repos_dir.mkdir(parents=True, exist_ok=True)  # Create the directory if it doesn't exist
+        self.logger.debug("Trying to load commit data")
+        commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
+        commit_data_df = self._read_commit_data(commit_data_file)
 
         page = 1
-        per_page = 100  # max allowed value
+        per_page = 100  # 100 repos per page
 
         self.logger.info("Getting %s student repos", self.accepted)
         pbar = tqdm(total=self.accepted, desc="Getting student repos")
         while True:
             # Fetch accepted assignments from GitHub API
-            command = f"/assignments/{self.id}/accepted_assignments?page={page}per_page={per_page}"
-            output = self._run_gh_api_command(command)
 
             try:
+                output = self._get_page(page, per_page)
                 accepted_assignments = json.loads(output)
                 if not accepted_assignments:
                     break  # exit loop if no more assignments
 
-                for submission in accepted_assignments:
-                    repo_info = submission.get("repository", {})
-                    repo_full_name = repo_info.get("full_name", "")
-                    student_repo_name = repo_full_name.split("/")[-1]
-                    student_repo_path = student_repos_dir / student_repo_name
-                    login = submission["students"][0]["login"]
-                    new_commit_count = submission.get("commit_count", 0)
+                with ThreadPoolExecutor() as executor:
+                    futures = [executor.submit \
+                               (self._get_student_repo, submission, student_repos_dir, commit_data_df, pbar) \
+                               for submission in accepted_assignments]
 
-                    # Check if this repo is already in the DataFrame
-                    existing_row = commit_data_df.loc[commit_data_df["student_repo_name"] == student_repo_name]
-                    if existing_row.empty or existing_row.iloc[0]["commit_count"] < new_commit_count:
-                        # Logic to clone or pull the repo
-                        if student_repo_path.exists():
-                            # Pull the repo
-                            pull_command = ["git", "pull"]
-                            self._run_command(pull_command, cwd=student_repo_path)
-                        else:
-                            # Clone the repo
-                            clone_command = ["git", "clone", f"{repo_info.get('html_url', '')}", f"{student_repo_path}"]
-                            self._run_command(clone_command)
-
-                        # TODO: think about how the following is affected by different time zones and locales.
-                        git_log_command = [
-                            "git", "log",  "-1",  r"--format=%cd,%an",
-                            r"--date=format-local:%d/%m/%y,%H:%M:%S", r"src/assignment.lean"
-                        ]
-                        git_log_result = self._run_command(git_log_command, cwd=student_repo_path)
-
-                        # Update or add the row in the DataFrame
-                        new_row = {
-                            "student_repo_name": student_repo_name,
-                            "login": login,
-                            "commit_count": new_commit_count,
-                        }
-
-                        if git_log_result:
-                            last_commit_date, last_commit_time, last_commit_author = git_log_result.strip().split(",")
-                            new_row["last_commit_date"] = last_commit_date
-                            new_row["last_commit_time"] = last_commit_time
-                            new_row["last_commit_author"] = last_commit_author
-
-                        commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
-                    pbar.update(1)
+                    for future in as_completed(futures):
+                        new_row = future.result()
+                        if new_row is not None:
+                            commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
 
                 page += 1  # increment to fetch the next page
+
+                # Save updated commit data
+                commit_data_df.to_csv(commit_data_file, index=False)
 
             except json.JSONDecodeError as e:
                 self.logger.addHandler(self.console_handler)
@@ -211,9 +266,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         pbar.close()
         self.logger.info("Received student repos")
-
-        # Save updated commit data
-        commit_data_df.to_csv(commit_data_file, index=False)
 
     def create_symlinks(self):
         """Symlink the _target and leanpkg.path from the starter repo to the student repos"""
