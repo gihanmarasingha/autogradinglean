@@ -163,7 +163,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         """Create a dictionary of assignments via parallel processing"""
         with ThreadPoolExecutor() as executor:
             # Create a future for each assignment
-            futures = [executor.submit(self._create_assignment, row["id"]) for _, row in self._df_assignments.iterrows()]
+            futures = [executor.submit(self._create_assignment, row["id"]) \
+                       for _, row in self._df_assignments.iterrows()]
 
             # As each future completes, add the assignment to the dictionary
             for future in as_completed(futures):
@@ -195,7 +196,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         (2) just ignore the issue
         """
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
-        merged_df = pd.merge(self.df_classroom_roster,self.df_candidates, left_on="identifier", right_on=self.candidate_id_col, how='left', indicator=True)
+        merged_df = pd.merge(self.df_classroom_roster,self.df_candidates, left_on="identifier", \
+                             right_on=self.candidate_id_col, how='left', indicator=True)
         no_match_df = merged_df[merged_df['_merge'] == 'left_only']
         missing_candidates = no_match_df.drop(columns=self.df_candidates.columns.to_list() + ['_merge'])
         self.save_query_output(missing_candidates, "missing_candidates", excel=True)
