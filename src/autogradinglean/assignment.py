@@ -2,17 +2,17 @@
 Representation of a GitHub Assignment
 """
 from __future__ import annotations
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 # pylint: disable=fixme
 import json
 import os
 import subprocess
 import time
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import toml
 import pandas as pd
+import toml
 from tqdm import tqdm  # for a progress bar
 
 from autogradinglean.base import GitHubClassroomQueryBase
@@ -101,10 +101,10 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
     def _get_mathlib(self, starter_repo_path):
         self.logger.debug("Testing if mathlib is a dependency")
-        leanpkgtoml_path = starter_repo_path / 'leanpkg.toml'
+        leanpkgtoml_path = starter_repo_path / "leanpkg.toml"
         leanpkgtoml = toml.load(leanpkgtoml_path)
-        if 'dependencies' in leanpkgtoml:
-            if 'mathlib' in leanpkgtoml['dependencies']:
+        if "dependencies" in leanpkgtoml:
+            if "mathlib" in leanpkgtoml["dependencies"]:
                 self.logger.info("Getting mathlib cache for stater repo...")
                 command = ["leanproject", "get-mathlib-cache"]
                 result = self._run_command(command, cwd=starter_repo_path)

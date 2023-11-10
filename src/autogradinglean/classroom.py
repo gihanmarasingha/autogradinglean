@@ -2,9 +2,9 @@
 Representation of a GitHub Classroom
 """
 from __future__ import annotations
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
@@ -105,7 +105,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
     def get_assignment_by_title(self, title):
         """Returns the first assignment with the given title (if it exists)"""
-        ids =self._df_assignments[self._df_assignments['title']==title]['id']
+        ids =self._df_assignments[self._df_assignments["title"]==title]["id"]
         self.logger.debug("Trying to get assignment titled %s", title)
         return self.assignments[ids.iloc[0]]
 
@@ -175,7 +175,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         """
         Returns those students who appear in the student record system data but not in the classroom roster. This
         typically indicates students who enrolled since the last update of the roster.
-        
+
         The instructor should manually adjust the classroom roster on GitHub and then update the local classroom roster.
         """
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
@@ -189,7 +189,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         """
         Returns those students on the classroom roster who are not in the student record system data. This typically
         indicates students who have unenrolled from the course.
-        
+
         The instructor can either:
         (1) manually update the GitHub classroom roster to remove those identifers and then update the local classroom
             roster or
@@ -197,9 +197,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         """
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
         merged_df = pd.merge(self.df_classroom_roster,self.df_candidates, left_on="identifier", \
-                             right_on=self.candidate_id_col, how='left', indicator=True)
-        no_match_df = merged_df[merged_df['_merge'] == 'left_only']
-        missing_candidates = no_match_df.drop(columns=self.df_candidates.columns.to_list() + ['_merge'])
+                             right_on=self.candidate_id_col, how="left", indicator=True)
+        no_match_df = merged_df[merged_df["_merge"] == "left_only"]
+        missing_candidates = no_match_df.drop(columns=self.df_candidates.columns.to_list() + ["_merge"])
         self.save_query_output(missing_candidates, "missing_candidates", excel=True)
         return missing_candidates
 
