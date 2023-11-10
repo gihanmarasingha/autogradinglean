@@ -185,7 +185,10 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         (2) just ignore the issue
         """
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
-        missing_candidates = self.df_student_data[self.df_student_data[self.candidate_id_col].isna()]
+        merged_df = pd.merge(self.df_classroom_roster,self.df_candidates, left_on="identifier", right_on=self.candidate_id_col, how='left', indicator=True)
+        no_match_df = merged_df[merged_df['_merge'] == 'left_only']
+        missing_candidates = no_match_df.drop(columns=self.df_candidates.columns.to_list() + ['_merge'])
+        self.save_query_output(missing_candidates, "missing_candidates", excel=True)
         return missing_candidates
 
     def find_unlinked_candidates(self):

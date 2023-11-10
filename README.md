@@ -144,7 +144,16 @@ time suffix to the filename. These can be safely edited or deleted as desired.
   passing students, and other data. This file is created each time the GitHubClassroom object is initialised.
 * missing_roster_idsXXX.xlsx: created by find_missing_roster_identifiers(). Shows the candidate number and the values
   from the columns listed in output_cols.
-* **COMPLETE THIS**.
+* missing_candidatesXXX.xlsx: created by find_missing_candidates(). Shows the rows from the classroom roster for those
+  students who do not appear in the candidate file.
+* unlinked_candidatesXXX.xlsx: those candidates who have not yet linked their candidate number with a roster identifier.
+
+### Logging
+
+Actions are logged to `classroom.log`. For additional logging information, initialialse a GitHubClassroom object with
+the argument `debug = True`. For example
+
+  myclass = GitHubClassroom('myrootdir', debug=True)
 
 ## GitHubAssignment
 
