@@ -198,7 +198,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         else:
             pbar.update(1)
             return None
-        
+
     def _get_page(self, page, per_page):
         """
         Get a page of submissions.
