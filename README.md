@@ -65,7 +65,7 @@ Primarily, I use `gh` together with the [Classroom REST API](https://docs.github
 
 ## GitHubClassroomManager
 
-This is a simple wrapper around the `/classrooms` REST API call. It has only one property, `df_classrooms`. This
+This is a simple wrapper around the `/classrooms` REST API call. It has only one attribute, `df_classrooms`. This
 is a Pandas DataFrame of the GitHub classrooms for the current user.
 
 Example use:
