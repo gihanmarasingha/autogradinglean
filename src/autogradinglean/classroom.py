@@ -2,6 +2,7 @@
 Representation of a GitHub Classroom
 """
 from __future__ import annotations
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import json
 from pathlib import Path
@@ -54,7 +55,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.debug = debug
         self.logger, self.file_handler, self.console_handler = \
             self._initialise_logger(logger_name, log_file, debug = self.debug)
-        
+
         self.id = self.df_classroom_roster = self.df_candidates = self.candidate_id_col = self.output_cols = None
         self.df_student_data = pd.DataFrame()
 
@@ -152,13 +153,22 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             df_classroom_roster, df_candidates, left_on="identifier", right_on=self.candidate_id_col, how="outer"
         )
 
-    def _initialize_assignments(self):
-        """Create a list of assignments"""
+    def _create_assignment(self, assignment_id):
+        """Function to create a GitHubAssignment instance."""
         from autogradinglean.assignment import GitHubAssignment  # pylint: disable=import-outside-toplevel
-        for _, row in self._df_assignments.iterrows():
-            assignment_id = row["id"]
-            new_assignment = GitHubAssignment(assignment_id, self)
-            self.assignments[assignment_id] = new_assignment
+        new_assignment = GitHubAssignment(assignment_id, self)
+        return assignment_id, new_assignment
+
+    def _initialize_assignments(self):
+        """Create a dictionary of assignments via parallel processing"""
+        with ThreadPoolExecutor() as executor:
+            # Create a future for each assignment
+            futures = [executor.submit(self._create_assignment, row["id"]) for _, row in self._df_assignments.iterrows()]
+
+            # As each future completes, add the assignment to the dictionary
+            for future in as_completed(futures):
+                assignment_id, new_assignment = future.result()
+                self.assignments[assignment_id] = new_assignment
 
     def find_missing_roster_identifiers(self):
         """
