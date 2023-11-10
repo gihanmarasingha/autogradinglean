@@ -117,7 +117,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 else:
                     self.logger.info("...successfully configured the starter repository.")
             else:
-
                 self.logger.warning("Starter repository does not exist. Please clone it first.")
 
         finally:
@@ -150,8 +149,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         Get a single student repository
         """
         repo_info = submission.get("repository", {})
-        repo_full_name = repo_info.get("full_name", "")
-        student_repo_name = repo_full_name.split("/")[-1]
+        student_repo_name = repo_info.get("full_name", "").split("/")[-1]
         student_repo_path = student_repos_dir / student_repo_name
         login = submission["students"][0]["login"]
         new_commit_count = submission.get("commit_count", 0)
@@ -194,10 +192,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
             pbar.update(1)
             return new_row
-            # commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
-        else:
-            pbar.update(1)
-            return None
+        pbar.update(1) # No update needed
+        return None
 
     def _get_page(self, page, per_page):
         """
@@ -284,11 +280,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                 if not leanpkg_link.exists():
                     os.symlink(starter_repo_dir / "leanpkg.path", leanpkg_link)
 
-    def run_autograding(self):
-        """Runs autograding on all student repositories. Assumes that we have retrieved the starter repo,
-        the starter repo mathlib, downloaded the student repos and created the symlinks"""
-        # Logic to run autograding
-        # Step 0: Load the existing grades DataFrame or create a new one
+    def _get_grades(self):
         grades_file = Path(self.assignment_dir) / "grades.csv"
         if grades_file.exists():
             df_grades = pd.read_csv(grades_file)
@@ -305,79 +297,22 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                     "comment",
                 ]
             )
-            # df_grades.set_index('student_identifier', inplace=True)
+        return grades_file, df_grades
 
-        # Load student repo data and commit counts
-        commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
-        commit_data_df = pd.read_csv(commit_data_file)
+    def _grade_repo(self, repo_path):
+        result = subprocess.run(
+            ["lean", ".evaluate/evaluate.lean"],
+            capture_output=True, text=True, shell=False, check=False, cwd=repo_path
+        ).stdout
 
-        self.logger.info("Autograding student repos...")
-        pbar = tqdm(total=self.accepted, desc="Autograding student repos")
-        # Loop through each student repo
-        for _, row in commit_data_df.iterrows():
-            commit_count = row.get("commit_count", 0)
-            login = row["login"]
-            student_repo_name = row["student_repo_name"]
-            self.logger.debug("Examining student repo %s", student_repo_name)
-            # Check if this login exists in df_grades
-            existing_row = df_grades.loc[df_grades["github_username"] == login]
+        # Step 3: Check the output
+        if "sorry" not in result and "error" not in result:
+            grade = 100
+        else:
+            grade = 0
+        return grade
 
-            # Check if we should proceed with grading
-            if existing_row.empty or existing_row.iloc[0]["commit_count"] < commit_count:
-                # Do some grading!
-                #print(f"Grading for {login} with commit_count {commit_count}")
-                repo_path = Path(self.assignment_dir) / "student_repos" / student_repo_name
-                # Step 2: Run the lean command
-                result = subprocess.run(
-                    ["lean", ".evaluate/evaluate.lean"],
-                    capture_output=True, text=True, shell=False, check=False, cwd=repo_path
-                ).stdout
-
-                # Step 3: Check the output
-                if "sorry" not in result and "error" not in result:
-                    grade = 100
-                else:
-                    grade = 0
-
-                # Update the DataFrame
-                # TODO: think carefully about what happens if a student makes a commit after the deadline.
-                #   There are several possibilities:
-                # 1) The student made no commit before the deadline. Then this counts as their only commit. The Hub can
-                #       determine what mark should be awarded.
-                # 2) The student made a commit before the deadline *and* after the deadline.
-                #   The fairest resolution might be to start by grading the last submission before the deadline. If
-                #   (on the advice of the Hub), mitigation is given, then a chosen submission after the deadline should
-                #   be marked.
-                #   If we go down this route, I'll have to think about how to represent the grades in the DataFrame.
-                last_commit_date = row.get("last_commit_date")
-                last_commit_time = row.get("last_commit_time")
-                last_commit_author = row.get("last_commit_author")
-
-                new_row = {
-                    "github_username": login,
-                    "grade": grade,
-                    "commit_count": commit_count,
-                    "last_commit_date": last_commit_date,
-                    "last_commit_time": last_commit_time,
-                    "last_commit_author": last_commit_author,
-                }
-
-                if existing_row.empty:
-                    # Append new row with default values for manual_grade and comment
-                    new_row["manual_grade"] = None
-                    new_row["comment"] = None
-                    df_grades = pd.concat([df_grades, pd.DataFrame([new_row])], ignore_index=True)
-                else:
-                    # Update existing row without modifying manual_grade and comment
-                    existing_index = existing_row.index[0]
-                    for key, value in new_row.items():
-                        df_grades.at[existing_index, key] = value
-            else:
-                self.logger.debug("Repo %s not updated since last run. Not grading.", student_repo_name)
-            pbar.update(1)
-
-        pbar.close()
-        self.logger.info("...autograding complete")
+    def _save_grades(self, df_grades, grades_file):
         # Save the updated DataFrame
         df_grades.to_csv(grades_file, index=False)
 
@@ -403,13 +338,76 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         self.save_query_output(df_grades_out, "grades", excel=True)
 
-    # def update_grades(self):
-    # Logic to update the df_grades DataFrame
-    #    pass
+    def _update_student_grade(self, grade, row, existing_row, df_grades):
+        """
+        Update the dataframe with the new student grade
+        """
+        # Update the DataFrame
+        # TODO: think carefully about what happens if a student makes a commit after the deadline.
+        #   There are several possibilities:
+        # 1) The student made no commit before the deadline. Then this counts as their only commit. The Hub can
+        #       determine what mark should be awarded.
+        # 2) The student made a commit before the deadline *and* after the deadline.
+        #   The fairest resolution might be to start by grading the last submission before the deadline. If
+        #   (on the advice of the Hub), mitigation is given, then a chosen submission after the deadline should
+        #   be marked.
+        #   If we go down this route, I'll have to think about how to represent the grades in the DataFrame.
+        new_row = {
+            "github_username": row["login"],
+            "grade": grade,
+            "commit_count": row.get("commit_count", 0),
+            "last_commit_date": row.get("last_commit_date"),
+            "last_commit_time": row.get("last_commit_time"),
+            "last_commit_author": row.get("last_commit_author"),
+        }
 
-    # def save_grades_to_csv(self):
-    # Logic to save grades to a CSV file
-    #    pass
+        if existing_row.empty:
+            # Append new row with default values for manual_grade and comment
+            new_row["manual_grade"] = None
+            new_row["comment"] = None
+            df_grades = pd.concat([df_grades, pd.DataFrame([new_row])], ignore_index=True)
+        else:
+            # Update existing row without modifying manual_grade and comment
+            existing_index = existing_row.index[0]
+            for key, value in new_row.items():
+                df_grades.at[existing_index, key] = value
+
+    def run_autograding(self):
+        """Runs autograding on all student repositories. Assumes that we have retrieved the starter repo,
+        the starter repo mathlib, downloaded the student repos and created the symlinks"""
+        # Load the existing grades DataFrame or create a new one
+        grades_file, df_grades = self._get_grades()
+        # Load student repo data and commit counts
+        commit_data_file = Path(self.assignment_dir) / "commit_data.csv"
+        commit_data_df = pd.read_csv(commit_data_file)
+
+        self.logger.info("Autograding student repos...")
+        pbar = tqdm(total=self.accepted, desc="Autograding student repos")
+        # Loop through each student repo
+        for _, row in commit_data_df.iterrows():
+            commit_count = row.get("commit_count", 0)
+            login = row["login"]
+            student_repo_name = row["student_repo_name"]
+            self.logger.debug("Examining student repo %s", student_repo_name)
+            # Check if this login exists in df_grades
+            existing_row = df_grades.loc[df_grades["github_username"] == login]
+
+            # Check if we should proceed with grading
+            if existing_row.empty or existing_row.iloc[0]["commit_count"] < commit_count:
+                # Do some grading!
+                repo_path = Path(self.assignment_dir) / "student_repos" / student_repo_name
+                # Run the lean command
+                grade = self._grade_repo(repo_path)
+
+                self._update_student_grade(grade, row, existing_row, df_grades)
+            else:
+                self.logger.debug("Repo %s not updated since last run. Not grading.", student_repo_name)
+            pbar.update(1)
+
+        pbar.close()
+        self.logger.info("...autograding complete")
+
+        self._save_grades(df_grades, grades_file)
 
     def autograde(self):
         """High-level method to perform all autograding steps"""
