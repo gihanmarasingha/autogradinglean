@@ -2,7 +2,7 @@
 Representation of a GitHub Assignment
 """
 from __future__ import annotations
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 
 # pylint: disable=fixme
 import json
@@ -268,7 +268,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
                             commit_data_df = pd.concat([commit_data_df, pd.DataFrame([new_row])], ignore_index=True)
 
                 page += 1  # increment to fetch the next page
-
                 # Save updated commit data
                 commit_data_df.to_csv(commit_data_file, index=False)
 
@@ -317,7 +316,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             )
         return grades_file, df_grades
 
-    def _grade_repo(self, repo_path):
+    @staticmethod
+    def _run_grading_command(repo_path):
         result = subprocess.run(
             ["lean", ".evaluate/evaluate.lean"],
             capture_output=True, text=True, shell=False, check=False, cwd=repo_path
@@ -356,7 +356,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         self.save_query_output(df_grades_out, "grades", excel=True)
 
-    def _update_student_grade(self, grade, row, existing_row, df_grades):
+    @staticmethod
+    def _update_student_grade(grade, row, existing_row):
         """
         Update the dataframe with the new student grade
         """
@@ -379,16 +380,27 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             "last_commit_author": row.get("last_commit_author"),
         }
 
-        if existing_row.empty:
-            # Append new row with default values for manual_grade and comment
-            new_row["manual_grade"] = None
-            new_row["comment"] = None
-            df_grades = pd.concat([df_grades, pd.DataFrame([new_row])], ignore_index=True)
-        else:
-            # Update existing row without modifying manual_grade and comment
-            existing_index = existing_row.index[0]
-            for key, value in new_row.items():
-                df_grades.at[existing_index, key] = value
+        return existing_row, new_row
+
+    @staticmethod
+    def _grade_repo(row, assignment_dir, df_grades, logger):
+        commit_count = row.get("commit_count", 0)
+        login = row["login"]
+        student_repo_name = row["student_repo_name"]
+        logger.debug("Examining student repo %s", student_repo_name)
+        # Check if this login exists in df_grades
+        existing_row = df_grades.loc[df_grades["github_username"] == login]
+
+        # Check if we should proceed with grading
+        if existing_row.empty or existing_row.iloc[0]["commit_count"] < commit_count:
+            # Do some grading!
+            repo_path = Path(assignment_dir) / "student_repos" / student_repo_name
+            # Run the lean command
+            grade = GitHubAssignment._run_grading_command(repo_path)
+
+            return GitHubAssignment._update_student_grade(grade, row, existing_row)
+        logger.debug("Repo %s not updated since last run. Not grading.", student_repo_name)
+        return None
 
     def run_autograding(self):
         """Runs autograding on all student repositories. Assumes that we have retrieved the starter repo,
@@ -402,25 +414,26 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         self.logger.info("Autograding student repos...")
         pbar = tqdm(total=self.accepted, desc="Autograding student repos")
         # Loop through each student repo
-        for _, row in commit_data_df.iterrows():
-            commit_count = row.get("commit_count", 0)
-            login = row["login"]
-            student_repo_name = row["student_repo_name"]
-            self.logger.debug("Examining student repo %s", student_repo_name)
-            # Check if this login exists in df_grades
-            existing_row = df_grades.loc[df_grades["github_username"] == login]
 
-            # Check if we should proceed with grading
-            if existing_row.empty or existing_row.iloc[0]["commit_count"] < commit_count:
-                # Do some grading!
-                repo_path = Path(self.assignment_dir) / "student_repos" / student_repo_name
-                # Run the lean command
-                grade = self._grade_repo(repo_path)
+        with ProcessPoolExecutor() as executor:
+            futures = [executor.submit(self._grade_repo, row, self.assignment_dir, df_grades, self.logger) \
+                       for _, row in commit_data_df.iterrows()]
 
-                self._update_student_grade(grade, row, existing_row, df_grades)
-            else:
-                self.logger.debug("Repo %s not updated since last run. Not grading.", student_repo_name)
-            pbar.update(1)
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    existing_row, new_row = result
+                    if existing_row.empty:
+                        # Append new row with default values for manual_grade and comment
+                        new_row["manual_grade"] = None
+                        new_row["comment"] = None
+                        df_grades = pd.concat([df_grades, pd.DataFrame([new_row])], ignore_index=True)
+                    else:
+                        # Update existing row without modifying manual_grade and comment
+                        existing_index = existing_row.index[0]
+                        for key, value in new_row.items():
+                            df_grades.at[existing_index, key] = value
+                pbar.update(1)
 
         pbar.close()
         self.logger.info("...autograding complete")
@@ -436,8 +449,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.get_student_repos()
             self.create_symlinks()
             self.run_autograding()
-            # self.update_grades()
-            # self.save_grades_to_csv()
         finally:
             self.logger.removeHandler(self.console_handler)
 
