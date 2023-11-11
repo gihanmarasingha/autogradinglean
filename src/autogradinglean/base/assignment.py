@@ -10,7 +10,6 @@ Any derived class must implement the methods
 """
 from __future__ import annotations
 
-# pylint: disable=fixme
 import json
 import time
 from abc import abstractmethod
@@ -22,12 +21,6 @@ from tqdm import tqdm  # for a progress bar
 
 from autogradinglean.base.base import GitHubClassroomQueryBase
 from autogradinglean.base.classroom import GitHubClassroom
-
-# TODO: Document the methods that
-# 2) create outputs for mail merge:
-# 2.1) Write to candidates with no corresponding github username (classroom level)
-# 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct
-#       (classroom level)
 
 class GitHubAssignment(GitHubClassroomQueryBase):
     """Represents a GitHub assignment and provides methods for downloading repositories, autograding, etc."""
@@ -180,7 +173,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         """
         Get a page of submissions.
 
-        Due to GitHub API rate limitingm, if the call to `_run_gh_api_command` fails, we should wait and try again
+        Due to GitHub API rate limiting, if the call to `_run_gh_api_command` fails, we should wait and try again
 
         TODO:
         * incorporate this into the `_run_gh_api_command` function (and get rid of this function).

@@ -13,15 +13,6 @@ import toml
 
 from autogradinglean.base.base import GitHubClassroomQueryBase
 
-# pylint: disable=fixme
-
-# TODO: Document the methods that
-# 2) create outputs for mail merge:
-# 2.1) Write to candidates with no corresponding github username (classroom level)
-# 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct
-#       (classroom level)
-
-
 class GitHubClassroom(GitHubClassroomQueryBase):
     """Class that encapsulates a GitHub Classroom. Contains GitHubAssignment objects
     exposes functions for reporting on unlinked candidates and other useful information.
