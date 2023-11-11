@@ -340,7 +340,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         # Filter student data
         df_student_data_filtered = self.parent_classroom.df_student_data[
-            ~self.parent_classroom.df_student_data[self.parent_classroom.candidate_id_col].isna()
+            ~self.parent_classroom.df_student_data \
+                [self.parent_classroom.config["candidate_file"]["candidate_id_col"]].isna()
         ]
 
         # Merge the dataframes
@@ -468,6 +469,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             how="inner",
         )
         df_no_commits = df_no_commits[
-            ["identifier", "github_username", *self.parent_classroom.output_cols, "student_repo_name"]
+            ["identifier", "github_username", *self.parent_classroom.config["candidate_file"]["output_cols"], \
+             "student_repo_name"]
         ]
         self.save_query_output(df_no_commits, "no_commits", excel=True)

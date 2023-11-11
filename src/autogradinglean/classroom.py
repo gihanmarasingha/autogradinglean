@@ -1,10 +1,10 @@
 """
 Representation of a GitHub Classroom
 """
-from __future__ import annotations
+from __future__ import annotations      # needed to deal with circular references to GitHubAssignment
 
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed # parallel processing
 from pathlib import Path
 
 import pandas as pd
@@ -56,7 +56,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.logger, self.file_handler, self.console_handler = \
             self._initialise_logger(logger_name, log_file, debug = self.debug)
 
-        self.id = self.df_classroom_roster = self.df_candidates = self.candidate_id_col = self.output_cols = None
+        self.df_classroom_roster = self.df_candidates = None
+        self.config = None
         self.df_student_data = pd.DataFrame()
 
         self._queries_dir = self.marking_root_dir / "query_output"
@@ -84,9 +85,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.df_classroom_roster = pd.read_csv(classroom_roster_csv, dtype=object)
         self.df_candidates = pd.read_csv(candidate_file, dtype=object)
 
-        self.candidate_id_col = config["candidate_file"]["candidate_id_col"]
-        self.output_cols = config["candidate_file"]["output_cols"]
         self._merge_student_data()
+        self.config = config
 
     def list_assignments(self):
         """Returns the Pandas DataFrame of assignment data"""
@@ -121,7 +121,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     def _fetch_assignments(self):
         """Gets a dataframe of assignments for this classroom"""
         self.logger.info("Fetching assignments from GitHub")
-        command = f"/classrooms/{self.id}/assignments"
+        classroom_id = self.config["classroom_id"]
+        command = f"/classrooms/{classroom_id}/assignments"
         output = self._run_gh_api_command(command)
 
         try:
@@ -144,7 +145,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         df_candidates = self.df_candidates
 
         self.df_student_data = pd.merge(
-            df_classroom_roster, df_candidates, left_on="identifier", right_on=self.candidate_id_col, how="outer"
+            df_classroom_roster, df_candidates, left_on="identifier", \
+                right_on=self.config["candidate_file"]["candidate_id_col"], how="outer"
         )
 
     def _create_assignment(self, assignment_id):
@@ -175,7 +177,8 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
         self.logger.info("Finding missing roster identifiers")
         mask = self.df_student_data["identifier"].isna()
-        missing_roster_ids = self.df_student_data.loc[mask, [self.candidate_id_col, *self.output_cols]]
+        missing_roster_ids = self.df_student_data.loc[mask, [self.config["candidate_file"]["candidate_id_col"], \
+                                                             *self.config["candidate_file"]["output_cols"]]]
         self.save_query_output(missing_roster_ids, "missing_roster_ids", excel=True)
         return missing_roster_ids
 
@@ -191,7 +194,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         """
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
         merged_df = pd.merge(self.df_classroom_roster,self.df_candidates, left_on="identifier", \
-                             right_on=self.candidate_id_col, how="left", indicator=True)
+                             right_on=self.config["candidate_file"]["candidate_id_col"], how="left", indicator=True)
         no_match_df = merged_df[merged_df["_merge"] == "left_only"]
         missing_candidates = no_match_df.drop(columns=self.df_candidates.columns.to_list() + ["_merge"])
         self.save_query_output(missing_candidates, "missing_candidates", excel=True)
@@ -199,8 +202,10 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
     def find_unlinked_candidates(self):
         """Returns those candidates who have not linked their GitHub account with the roster"""
-        mask = self.df_student_data["github_username"].isna() & self.df_student_data[self.candidate_id_col].notna()
-        unlinked_candidates = self.df_student_data.loc[mask, [self.candidate_id_col, *self.output_cols]]
+        mask = self.df_student_data["github_username"].isna() & \
+            self.df_student_data[self.config["candidate_file"]["candidate_id_col"]].notna()
+        unlinked_candidates = self.df_student_data.loc[mask, [self.config["candidate_file"]["candidate_id_col"], \
+                                                              *self.config["candidate_file"]["output_cols"]]]
         self.logger.info("Finding unlinked candidates")
         self.save_query_output(unlinked_candidates, "unlinked_candidates", excel=True)
         return unlinked_candidates
