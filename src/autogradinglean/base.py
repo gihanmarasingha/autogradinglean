@@ -35,21 +35,26 @@ class GitHubClassroomBase:
     _ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
     @staticmethod
-    def _run_command_base(command, cwd=None):
+    def _run_command_base(command, cwd=None, logger=None):
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
+        if logger is not None:
+            logger.debug("Running command %s", command)
         result = subprocess.run(command, capture_output=True, text=True, shell=False, check=False, cwd=cwd)
         if result.returncode != 0:
             return None
         return result.stdout
 
     @staticmethod
-    def _run_gh_api_command_base(command):
+    def _run_gh_api_command_base(command, logger=None):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
         gh_api = ["gh","api", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"]
-        raw_ouput = GitHubClassroomBase._run_command_base([*gh_api, command])
-        return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
-
+        try:
+            raw_ouput = GitHubClassroomBase._run_command_base([*gh_api, command], logger=logger)
+            return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
+        except TypeError as e:
+            logger.debug("Encountered TypeError %s", e)
+            return None
 
 class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
     """Abstract base class for classes that output query results and performs logging"""
