@@ -273,7 +273,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         pbar.close()
         self.logger.info("Received student repos")
 
-    def create_symlinks(self):
+    def configure_student_repos(self):
         """Symlink the _target and leanpkg.path from the starter repo to the student repos"""
         student_repos_dir = Path(self.assignment_dir) / "student_repos"
         starter_repo_dir = Path(self.assignment_dir) / "starter_repo"
@@ -440,7 +440,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.get_starter_repo()
             self.configure_starter_repo()
             self.get_student_repos()
-            self.create_symlinks()
+            self.configure_student_repos()
             self.run_autograding()
         finally:
             self.logger.removeHandler(self.console_handler)
