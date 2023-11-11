@@ -1,12 +1,13 @@
-# Autograding Lean submissions using GitHub Classroom and GitHub Codespaces
+# Local autograding and student record integration via GitHub Classroom and GitHub Codespaces
 
 [![PyPI - Version](https://img.shields.io/pypi/v/autogradinglean.svg)](https://pypi.org/project/autogradinglean)
 [![PyPI - Python Version](https://img.shields.io/pypi/pyversions/autogradinglean.svg)](https://pypi.org/project/autogradinglean)
 
-I will describe a workflow and provide tools by which an instructor can use GitHub Classroom for assessing mathematical
-proof via the LEAN interactive theorem prover. Currently, this repository is designed for use with Lean 3.
+I will describe a workflow and provide tools by which an instructor can use GitHub Classroom for performing local
+autograding and manual grading, integrating the results with your student recrod system.
 
-
+The tool is extensible: the instructor should write derived classes for each assessment type. I present an example
+class for assessing proofs written using the Lean interactive theorem prover.
 
 -----
 
@@ -57,6 +58,9 @@ The classes are:
 
   This class reports on those candidates who have not made and pushed a commit to their student repository.
 
+  You **must** write your own class, derived from this, for each type of assignment, though not necessarily for each
+  assignment.
+
 Currently, the package interacts with GitHub Classroom primarily by creating subprocesses that run the GitHub's `gh`
 CLI with the classroom extension. This is why the [installation](#installation) instructions require `gh`.
 
@@ -92,6 +96,7 @@ This class represents a GitHub Classroom and the sets of candidates from your st
 You must supply a 'classroom directory' as an argument to the constructor. In the root of this directory, there must
 be a file `config.toml`. Here is a sample config file:
 
+    [classroom_data]
     classroom_id = "999999"
     classroom_roster_csv = "classroom_roster.csv"
 
@@ -99,6 +104,11 @@ be a file `config.toml`. Here is a sample config file:
     filename = "STUDENT_DATA.csv"
     candidate_id_col = "Candidate No"
     output_cols = ["Forename", "Surname", "Email Address"]
+
+    [assignment_types]
+    default = "autograding.lean.GitHubAssignmentLean"
+    assignment123123 = "my_module.PythonGrading"
+    assignment536214 = "my_module.MathlabGrading"
 
 * `classroom_id` is the identifier of the classroom, as returned by GitHubClassroomManager.
 * `classroom_roster_csv` is the name of the csv file containing the GitHub Classroom roster for this classroom. At

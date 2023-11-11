@@ -6,6 +6,7 @@ from __future__ import annotations      # needed to deal with circular reference
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed # parallel processing
 from pathlib import Path
+import importlib
 
 import pandas as pd
 import toml
@@ -27,6 +28,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
     Configured by a toml file `config.toml` in the specified directory. The file should take the following form:
 
+        [classroom_data]
         classroom_id = "666666"
         classroom_roster_csv = "classroom_roster.csv"
 
@@ -34,6 +36,13 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         filename = "mth9999.csv"
         candidate_id_col = "Candidate No"
         output_cols = ["Forename", "Surname", "Email Address"]
+
+        [assignment_types]
+        default = "GitHubAssignmentLean"
+        assignment123123 = "PythonGrading"
+        assignment536214 = "MathlabGrading"
+
+
 
     Above,
     * classroom_id is the GitHub classroom id (which can be found via a GitHutClassrooms object),
@@ -71,22 +80,21 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
         self.logger.info("Reading config.toml file")
         config_file_path = self.marking_root_dir / "config.toml"
-        config = self._load_config_from_toml(config_file_path)
+        self.config = self._load_config_from_toml(config_file_path)
 
-        if config is None:
+        if self.config is None:
             msg = "Failed to load configuration. Initialization aborted."
             self.logger.error(msg)
             raise RuntimeError(msg)
-        self.id = config["classroom_id"]
+        self.id = self.config["classroom_data"]["classroom_id"]
 
-        classroom_roster_csv = self.marking_root_dir / config["classroom_roster_csv"]
-        candidate_file = self.marking_root_dir / config["candidate_file"]["filename"]
+        classroom_roster_csv = self.marking_root_dir / self.config["classroom_data"]["classroom_roster_csv"]
+        candidate_file = self.marking_root_dir / self.config["candidate_file"]["filename"]
 
         self.df_classroom_roster = pd.read_csv(classroom_roster_csv, dtype=object)
         self.df_candidates = pd.read_csv(candidate_file, dtype=object)
 
         self._merge_student_data()
-        self.config = config
 
     def list_assignments(self):
         """Returns the Pandas DataFrame of assignment data"""
@@ -121,7 +129,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     def _fetch_assignments(self):
         """Gets a dataframe of assignments for this classroom"""
         self.logger.info("Fetching assignments from GitHub")
-        classroom_id = self.config["classroom_id"]
+        classroom_id = self.config["classroom_data"]["classroom_id"]
         command = f"/classrooms/{classroom_id}/assignments"
         output = self._run_gh_api_command(command)
 
@@ -149,17 +157,26 @@ class GitHubClassroom(GitHubClassroomQueryBase):
                 right_on=self.config["candidate_file"]["candidate_id_col"], how="outer"
         )
 
-    def _create_assignment(self, assignment_id):
+    def _get_class(self, full_class_name):
+        module_name, class_name = full_class_name.rsplit('.', 1)
+        module = importlib.import_module(module_name)
+        return getattr(module, class_name)
+
+
+    def _create_assignment(self, assignment_id, default_type, assignment_types):
         """Function to create a GitHubAssignment instance."""
-        from autogradinglean.assignment import GitHubAssignment  # pylint: disable=import-outside-toplevel
-        new_assignment = GitHubAssignment(assignment_id, self)
+        assignment_class_name = assignment_types.get(f"assignment{assignment_id}", default_type)
+        assignment_class = self._get_class(assignment_class_name)
+        new_assignment = assignment_class(assignment_id, self)
         return assignment_id, new_assignment
 
     def _initialize_assignments(self):
         """Create a dictionary of assignments via parallel processing"""
+        default_type = self.config["assignment_types"]["default"]
+        assignment_types = self.config.get("assignment_types", {})
         with ThreadPoolExecutor() as executor:
             # Create a future for each assignment
-            futures = [executor.submit(self._create_assignment, row["id"]) \
+            futures = [executor.submit(self._create_assignment, row["id"], default_type, assignment_types) \
                        for _, row in self._df_assignments.iterrows()]
 
             # As each future completes, add the assignment to the dictionary
