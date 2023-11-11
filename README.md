@@ -27,11 +27,11 @@ pip install autogradinglean
 
 You will also need to install the [GitHub CLI app](https://cli.github.com), called `gh``. Authenticate the app by typing
 
-  gh auth login
+    gh auth login
 
 at the command prompt. Then install the [classroom extension](https://docs.github.com/en/education/manage-coursework-with-github-classroom/teach-with-github-classroom/using-github-classroom-with-github-cli) for `gh` by typing
 
-  gh extension install github/gh-classroom
+    gh extension install github/gh-classroom
 
 
 ## Overview
@@ -53,13 +53,21 @@ The classes are:
   GitHub username. It can also find candidates who have enrolled (or unenrolled) since you set up the roster.
 
   This is also a container class, containing one GitHubAssignment object per assignment.
-* GitHubAssignment: an abstraction of a GitHub Classroom assignment. Through this module, you can get the starter
+* GitHubAssignment: an abstract class that represents a GitHub Classroom assignment. Through this module, you can get the starter
   repository and the set of student repositories. You can perform local autograding, adding manual marks and comments.
 
   This class reports on those candidates who have not made and pushed a commit to their student repository.
 
-  You **must** write your own class, derived from this, for each type of assignment, though not necessarily for each
-  assignment.
+  In application, you must use a derived class of GitHubAssignment that specifies the following methods
+
+  * configure_starter_repo
+  * configure_student_repos
+  * _run_grading_command
+
+  For example, you may have a derived class `GitHubAssignmentPython` suitable for grading Python assignments.
+
+  This package provides a class `GitHubAssignmentLean3` that can be used for grading assignments that involve the Lean 3
+  interactive theorem prover.
 
 Currently, the package interacts with GitHub Classroom primarily by creating subprocesses that run the GitHub's `gh`
 CLI with the classroom extension. This is why the [installation](#installation) instructions require `gh`.
@@ -69,7 +77,7 @@ Primarily, I use `gh` together with the [Classroom REST API](https://docs.github
 
 ## GitHubClassroomManager
 
-This is a simple wrapper around the `/classrooms` REST API call. It has only one attribute, `df_classrooms`. This
+This is a simple wrapper around the `/classrooms` REST API call. It has only one attribute, `classrooms`. This
 is a Pandas DataFrame of the GitHub classrooms for the current user.
 
 Example use:
@@ -77,7 +85,7 @@ Example use:
 from autogradinglean import GitHubClassroomManager
 
 rooms = GitHubClassroomManager()
-rooms.df_classrooms
+rooms.classrooms
 ```
 
 This is especially useful as it returns the list of classroom IDs for each classroom. These are needed for use
@@ -106,14 +114,19 @@ be a file `config.toml`. Here is a sample config file:
     output_cols = ["Forename", "Surname", "Email Address"]
 
     [assignment_types]
-    default = "autograding.lean.GitHubAssignmentLean"
+    default = "autogradinglean.lean3.assignment.GitHubAssignmentLean3"
     assignment123123 = "my_module.PythonGrading"
     assignment536214 = "my_module.MathlabGrading"
 
+#### Classroom data
+
 * `classroom_id` is the identifier of the classroom, as returned by GitHubClassroomManager.
 * `classroom_roster_csv` is the name of the csv file containing the GitHub Classroom roster for this classroom. At
-  present, there is no API for downloading this file. You must download it manually from GitHub Classroom.
+  present, GitHub presents no API for downloading this file. You must download it manually from GitHub Classroom.
   The filename can include a path, relative to the classroom directory root.
+
+#### Candidate file
+
 * `filename` is the name of a csv file containing information about your students, extracted from your student record
   system. There is no required format to this file except that it must contain a column that corresponds to the
   student identifiers of the GitHub Classroom roster. As with the `classroom_roster_csv`, the filename can include a
@@ -122,6 +135,13 @@ be a file `config.toml`. Here is a sample config file:
   the GitHub Classroom roster.
 * `output_cols` are the names of other columes in the student data file that should be included in the reporting
   methods of GitHubClassroom.
+
+#### Assignment types
+
+* `default` the full name of the class that will be used to grade every assignment in this classroom for which there
+  is no other specified class.
+* `assignmentXXXXXX` the name of the class used to grade the assignment with ID XXXXXX.
+
 
 ### Methods
 
@@ -144,7 +164,10 @@ be a file `config.toml`. Here is a sample config file:
 
   **Action**: ask these candidates to choose their roster identifier on GitHub.
 
-### Query output
+### Outputs
+
+When you instantiate an object of the `GitHubClassroom` class, the constructor creates one subdirectory of the
+'classroom directory' per assignment. Each subdirectory is called assignmentXXXXXX, where XXXXXX is the assignment ID.
 
 Many of the methods create CSV or Excel files that are stored in the `query_output` subdirectory, with a date and
 time suffix to the filename. These can be safely edited or deleted as desired.
@@ -165,13 +188,85 @@ the argument `debug = True`. For example
 
   myclass = GitHubClassroom('myrootdir', debug=True)
 
+### Example run
+
+Suppose you wish to store your classroom data in a directory called `~/Documents/myclassroom`.
+
+* First create `config.toml` file in the root of this directory, following the example above.
+* Also add a classroom roster file and a candidate file in a location specified in the `config.toml`
+* Open a Python interpreter and run
+
+      from autogradinglean import GitHubClassroom
+      myclass = GitHubClassroom('~/Documents/myclassroom')
+
+  to initialise the classroom.
+* Type
+
+      myclass.list_assignments()
+
+  to print and return a Pandas DataFrame showing the assignments for your GitHub Classroom.
+* Type
+
+      myclass.find_unlinked_candidates()
+
+  to print and return a Pandas Dataframe showing those candidates whose roster identifier
+  has not been linked with a GitHub username.
+
 ## GitHubAssignment
 
+Each `GitHubClassroom` object has an attribute `assignments`. This is a dictionary of objects of a (derived class) of
+`GitHubAssignment` objects. The objects are keyed by the assignment ID.
 
-Note that the commit author can be different from the GitHub username. This can occur if:
+It offers two kinds of methods. The first kind of method facilitates autograding:
 
-* The user has specified their name (or some other identifier) as the author or
-* the last commit was made by a bot such as `github-classroom[bot]`.
+* get_starter_repo: downloads the 'starter repository' associated with this assignment.
+* configure_starter_repo: performs whatever configuration is necessary. This method is abstract and should be defined
+  in a derived class.
+* get_student_repos: downloads all the student repositories for this assignment.
+* configure_student_repos: an abstract method which should be defined in a derived class to perform any necessary
+  configuration of the student repositories.
+* run_autograding: runs autograding on all the student repositories that have been downloaded. This function does not
+  check whether repos have been downloaded and configured.
+* autograde: runs all the above methods, in order.
+
+The second kind of method is for reporting:
+
+* find_no_commit_candidates: find the candidates who have not made a submission for this assignment. Though the natural
+  thing would be to test if 'commit_count' is zero, this doesn't always work (for reasons unbeknownst to me). That is,
+  sometimes a student will commit but the commit count will be zero. Apparently, issue has been fixed by GitHub
+  Classroom.
+
+  In any event, I will look for students where the last_commit_author is `github-classroom[bot]`.
+
+  To ensure you have the latest data, run `get_student_repos()` before running this function.
+
+### Outputs
+
+All outputs are stored in the assignment directory or a subdirectory of it. The assignment directory is a subdirectory
+of the classroom directory. It is named assignmentXXXXXX, where XXXXXX is the assignment ID.
+
+* A subdirectory `starter_repo` is created when you call the `get_starter_repo()` method. This contains a
+  clone of the starter repository.
+* A subdirectory `student_repo` is created with you call `get_student_repos()`. This directory contains
+  multiple directories, one for each student repository.
+
+  **Note** at the time of writing, anyone with a link to the Classroom assignment URL can start a
+  GitHub Classroom assignment. Thus, these student repositories need not correspond to your students!
+* A file `commit_data.csv` is also created in the assignment directory each time you call `get_student_repos()`.
+  This contains information about the commit count, commit times, and commit author for each of the student
+  repositories. This information is used internally by successive runs of `get_student_repos()` to determine
+  whether to pull or clone the student repository.
+* A file `grades.csv` is created when you run `run_autograding()`. This gives the github username, auto-generated
+  grade, commit count, commit date and time, last commit author and spaces for a **manual grade** and **comment**.
+  Successive runs of `run_autograding()` will not change the manual grade or comment.
+
+  The instructor should edit the `grades.csv` file manually to update manual grades and comments.
+* Each run of `run_autograding()` also places into the `query_output` subdirectory a file `gradesXXX.xlsx`, where
+  XXX is a date and time stamp. This Excel file combines the data from `grades.csv` with the classroom roster
+  and candidate file to produce a grade list for all candidates with a linked roster identifier. It provides
+  a 'final_grade' which is the maximum of the manual grade and the autograder result.
+* A file `no_commitsXXX.xlsx` is placed in the `query_output` subdirectory when you run `find_no_commit_candidates()`.
+  This shows those candidates who have accepted the assignment but have not yet made a commit.
 
 ## What is GitHub Classroom?
 
@@ -190,7 +285,7 @@ file](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-git
 
 ### Setting up a classroom
 
-The instructor wishing to use GitHub Classroom for autograding LEAN submissions must first create a
+The instructor wishing to use GitHub Classroom for autograding student submissions must first create a
 [GitHub Classroom](https://classroom.github.com/classrooms) corresponding to their module. It is
 recommended to create an additional classroom for testing purposes.
 
@@ -232,15 +327,11 @@ the instructor to email each student, asking them to check that the association 
 to GitHub username is correct. Mail merge can be used for this purpose. This package helps in preparing a mail merge.
 
 
-### GitHub Classroom autograding in general
-
-The details of autograding LEAN assignments are deferred to a later point in this article. Assuming
-that a LEAN autograding mechanism has been devised for use with GitHub Classroom, what remains to be
-done for the instructor to make use of the grades thereby produced?
+### Local versus remote autograding
 
 In an ideal world, in order to find the grades for a particular assignment, it would be sufficient
-to choose 'Download grades' from the 'Download' drop-down associated to each assignment. The result
-is a CSV file that gives, inter alia, the GitHub username, roster identifier, student repository
+to choose 'Download grades' from the 'Download' drop-down associated to each assignment in GitHub
+Classroom. The result is a CSV file that gives, inter alia, the GitHub username, roster identifier, student repository
 name, submission timestamp, and points awarded.
 
 There are a few problems with this system:
@@ -250,6 +341,9 @@ There are a few problems with this system:
 
 * The autograding workflow does not always run when a student performs an action that should cause
   it to trigger.
+
+* The GitHub Classroom autograder sometimes fails and then records a mark of zero even when the student repository
+  provides a correct answer.
 
 * You may wish to record manual marks for students and comments.
 
