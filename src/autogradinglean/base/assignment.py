@@ -329,11 +329,10 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         return existing_row, new_row
 
     @classmethod
-    def _grade_repo(cls, row, assignment_dir, df_grades, logger):
+    def _grade_repo(cls, row, assignment_dir, df_grades):
         commit_count = row.get("commit_count", 0)
         login = row["login"]
         student_repo_name = row["student_repo_name"]
-        logger.debug("Examining student repo %s", student_repo_name)
         # Check if this login exists in df_grades
         existing_row = df_grades.loc[df_grades["github_username"] == login]
 
@@ -345,7 +344,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             grade = cls._run_grading_command(repo_path)
 
             return cls._update_student_grade(grade, row, existing_row)
-        logger.debug("Repo %s not updated since last run. Not grading.", student_repo_name)
         return None
 
     def run_autograding(self):
@@ -362,13 +360,14 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         # Loop through each student repo
 
         with ProcessPoolExecutor() as executor:
-            futures = [executor.submit(type(self)._grade_repo, row, self.assignment_dir, df_grades, self.logger) \
+            futures = [executor.submit(type(self)._grade_repo, row, self.assignment_dir, df_grades) \
                        for _, row in commit_data_df.iterrows()]
 
             for future in as_completed(futures):
                 result = future.result()
                 if result is not None:
                     existing_row, new_row = result
+                    self.logger.debug("Graded repo for student with github username %s", new_row["github_username"])
                     if existing_row.empty:
                         # Append new row with default values for manual_grade and comment
                         new_row["manual_grade"] = None
