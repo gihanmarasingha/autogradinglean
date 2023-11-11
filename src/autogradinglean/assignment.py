@@ -42,19 +42,12 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
     def _run_command(self, command, cwd=None):
         """Runs the specified command as a subprocess. Returns None on error or the stdout"""
-        self.logger.debug("Running command %s", command)
-        return GitHubClassroomQueryBase._run_command_base(command, cwd)
+        return GitHubClassroomQueryBase._run_command_base(command, cwd=cwd, logger=self.logger)
 
     def _run_gh_api_command(self, command):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
-        self.logger.debug("Running command %s", command)
-        try:
-            result = GitHubClassroomQueryBase._run_gh_api_command_base(command)
-            return result
-        except TypeError as e:
-            self.logger.debug("Encountered TypeError %s", e)
-            return None
+        return GitHubClassroomQueryBase._run_gh_api_command_base(command, logger=self.logger)
 
     @property
     def queries_dir(self):

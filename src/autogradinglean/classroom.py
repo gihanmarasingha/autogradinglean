@@ -92,16 +92,10 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         """Returns the Pandas DataFrame of assignment data"""
         return self._df_assignments
 
-    def _run_command(self, command, cwd=None):
-        """Runs the specified command as a subprocess. Returns None on error or the stdout"""
-        self.logger.debug("Running command %s", command)
-        return GitHubClassroomQueryBase._run_command_base(command, cwd)
-
     def _run_gh_api_command(self, command):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
-        self.logger.debug("Running command %s", command)
-        return GitHubClassroomQueryBase._run_gh_api_command_base(command)
+        return GitHubClassroomQueryBase._run_gh_api_command_base(command, logger=self.logger)
 
     def get_assignment_by_title(self, title):
         """Returns the first assignment with the given title (if it exists)"""
