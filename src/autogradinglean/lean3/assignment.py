@@ -83,7 +83,6 @@ class GitHubAssignmentLean3(GitHubAssignment):
 
     @staticmethod
     def _run_grading_command(repo_path):
-        print("I am grading!!")
         result = subprocess.run(
             ["lean", ".evaluate/evaluate.lean"],
             capture_output=True, text=True, shell=False, check=False, cwd=repo_path
