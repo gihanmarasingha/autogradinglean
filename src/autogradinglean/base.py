@@ -1,12 +1,12 @@
 """
 Base classes for autograding with GitHub Classroom and Lean 3
 """
-import logging
-import re
-import subprocess
-import uuid
-from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+import logging                          # for logging!
+import re                               # needed for a hack that strips `gh` output of ansi codes.
+import subprocess                       # runs `gh` and other commands as subprocesses
+import uuid                             # ensure each logger is uniquely identified
+from abc import ABC, abstractmethod     # for abstract base classes
+from datetime import datetime, timezone # for attaching date and time to filenames
 
 # pylint: disable=fixme
 
