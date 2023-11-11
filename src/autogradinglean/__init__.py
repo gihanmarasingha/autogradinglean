@@ -1,5 +1,5 @@
 """
-Publically exposed classes
+Publicly exposed classes
 """
 # SPDX-FileCopyrightText: 2023-present Gihan Marasingha <gihan.marasingha@gmail.com>
 #
