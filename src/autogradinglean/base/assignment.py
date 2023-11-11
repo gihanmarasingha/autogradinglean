@@ -1,22 +1,28 @@
 """
-Representation of a GitHub Assignment
+Abstract representation of a GitHub Assignment
+
+Any derived class must implement the methods
+
+* configure_starter_repo()
+* configure_student_repos()
+* _run_grading_command()
+
 """
 from __future__ import annotations
 
 # pylint: disable=fixme
 import json
-import os
-import subprocess
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
+from abc import abstractmethod
+
 
 import pandas as pd
-import toml
 from tqdm import tqdm  # for a progress bar
 
-from autogradinglean.base import GitHubClassroomQueryBase
-from autogradinglean.classroom import GitHubClassroom
+from autogradinglean.base.base import GitHubClassroomQueryBase
+from autogradinglean.base.classroom import GitHubClassroom
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:
@@ -92,46 +98,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         else:
             self.logger.info("Retrieved starter repository.")
 
-    def _get_mathlib(self, starter_repo_path):
-        self.logger.debug("Testing if mathlib is a dependency")
-        leanpkgtoml_path = starter_repo_path / "leanpkg.toml"
-        leanpkgtoml = toml.load(leanpkgtoml_path)
-        if "dependencies" in leanpkgtoml:
-            if "mathlib" in leanpkgtoml["dependencies"]:
-                self.logger.info("Getting mathlib cache for stater repo...")
-                command = ["leanproject", "get-mathlib-cache"]
-                result = self._run_command(command, cwd=starter_repo_path)
-
-                if result is None:
-                    self.logger.error("Failed to get mathlib")
-                else:
-                    self.logger.info("...successfully retrieved mathlib cache")
-            return
-        self.logger.debug("Mathlib is not a dependency")
-
+    @abstractmethod
     def configure_starter_repo(self):
         """
         Configure the starter repository. This will download all dependencies.
         """
-        starter_repo_path = Path(self.assignment_dir) / "starter_repo"
-
-        self.logger.addHandler(self.console_handler)
-        self.logger.info("Configuring the starter repo...")
-        try:
-            if starter_repo_path.exists():
-                # If the starter repo directory exists, run leanpkg configure
-                command = ["leanpkg", "configure"]
-                result = self._run_command(command, cwd=starter_repo_path)
-                if result is None:
-                    self.logger.error("Failed to configure the starter repository.")
-                else:
-                    self.logger.info("...successfully configured the starter repository.")
-                self._get_mathlib(starter_repo_path)
-            else:
-                self.logger.warning("Starter repository does not exist. Please clone it first.")
-
-        finally:
-            self.logger.removeHandler(self.console_handler)
 
     def _read_commit_data(self, commit_data_file):
         """
@@ -273,22 +244,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         pbar.close()
         self.logger.info("Received student repos")
 
+    @abstractmethod
     def configure_student_repos(self):
-        """Symlink the _target and leanpkg.path from the starter repo to the student repos"""
-        student_repos_dir = Path(self.assignment_dir) / "student_repos"
-        starter_repo_dir = Path(self.assignment_dir) / "starter_repo"
-
-        self.logger.info("Creating symlinks")
-        for student_dir in student_repos_dir.iterdir():
-            if student_dir.is_dir():
-                target_link = student_dir / "_target"
-                leanpkg_link = student_dir / "leanpkg.path"
-
-                if not target_link.exists():
-                    os.symlink(starter_repo_dir / "_target", target_link)
-
-                if not leanpkg_link.exists():
-                    os.symlink(starter_repo_dir / "leanpkg.path", leanpkg_link)
+        """
+        Perform any configuration of the student repos required before moving on to grading
+        """
 
     def _get_grades(self):
         grades_file = Path(self.assignment_dir) / "grades.csv"
@@ -310,18 +270,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         return grades_file, df_grades
 
     @staticmethod
+    @abstractmethod
     def _run_grading_command(repo_path):
-        result = subprocess.run(
-            ["lean", ".evaluate/evaluate.lean"],
-            capture_output=True, text=True, shell=False, check=False, cwd=repo_path
-        ).stdout
-
-        # Step 3: Check the output
-        if "sorry" not in result and "error" not in result:
-            grade = 100
-        else:
-            grade = 0
-        return grade
+        """
+        Grades the given repo and returns a integer variable grade
+        """
 
     def _save_grades(self, df_grades, grades_file):
         # Save the updated DataFrame
@@ -376,8 +329,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         return existing_row, new_row
 
-    @staticmethod
-    def _grade_repo(row, assignment_dir, df_grades, logger):
+    @classmethod
+    def _grade_repo(cls, row, assignment_dir, df_grades, logger):
         commit_count = row.get("commit_count", 0)
         login = row["login"]
         student_repo_name = row["student_repo_name"]
@@ -390,9 +343,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             # Do some grading!
             repo_path = Path(assignment_dir) / "student_repos" / student_repo_name
             # Run the lean command
-            grade = GitHubAssignment._run_grading_command(repo_path)
+            grade = cls._run_grading_command(repo_path)
 
-            return GitHubAssignment._update_student_grade(grade, row, existing_row)
+            return cls._update_student_grade(grade, row, existing_row)
         logger.debug("Repo %s not updated since last run. Not grading.", student_repo_name)
         return None
 
@@ -410,7 +363,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         # Loop through each student repo
 
         with ProcessPoolExecutor() as executor:
-            futures = [executor.submit(self._grade_repo, row, self.assignment_dir, df_grades, self.logger) \
+            print("about to run futures")
+            futures = [executor.submit(type(self)._grade_repo, row, self.assignment_dir, df_grades, self.logger) \
                        for _, row in commit_data_df.iterrows()]
 
             for future in as_completed(futures):

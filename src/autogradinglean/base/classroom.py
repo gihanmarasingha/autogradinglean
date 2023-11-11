@@ -11,7 +11,7 @@ import importlib
 import pandas as pd
 import toml
 
-from autogradinglean.base import GitHubClassroomQueryBase
+from autogradinglean.base.base import GitHubClassroomQueryBase
 
 # pylint: disable=fixme
 
