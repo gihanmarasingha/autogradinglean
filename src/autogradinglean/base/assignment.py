@@ -12,19 +12,19 @@ from __future__ import annotations
 
 # pylint: disable=fixme
 import json
+import multiprocessing  # needed to allow the 'fork' start method
 import time
+from abc import abstractmethod
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from abc import abstractmethod
 
-import multiprocessing                  # needed to allow the 'fork' start method
 import pandas as pd
 from tqdm import tqdm  # for a progress bar
 
 from autogradinglean.base.base import GitHubClassroomQueryBase
 from autogradinglean.base.classroom import GitHubClassroom
 
-multiprocessing.set_start_method('fork')  # the 'spwan' start method causes errors. I don't know why.
+multiprocessing.set_start_method("fork")  # the 'spwan' start method causes errors. I don't know why.
 
 # TODO: Document the methods that
 # 2) create outputs for mail merge:

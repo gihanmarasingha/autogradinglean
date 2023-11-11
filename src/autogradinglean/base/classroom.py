@@ -1,12 +1,12 @@
 """
 Representation of a GitHub Classroom
 """
-from __future__ import annotations      # needed to deal with circular references to GitHubAssignment
+from __future__ import annotations  # needed to deal with circular references to GitHubAssignment
 
-import json
-from concurrent.futures import ThreadPoolExecutor, as_completed # parallel processing
-from pathlib import Path
 import importlib
+import json
+from concurrent.futures import ThreadPoolExecutor, as_completed  # parallel processing
+from pathlib import Path
 
 import pandas as pd
 import toml
@@ -158,7 +158,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         )
 
     def _get_class(self, full_class_name):
-        module_name, class_name = full_class_name.rsplit('.', 1)
+        module_name, class_name = full_class_name.rsplit(".", 1)
         module = importlib.import_module(module_name)
         return getattr(module, class_name)
 
