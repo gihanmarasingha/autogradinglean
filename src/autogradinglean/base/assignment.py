@@ -15,6 +15,7 @@ import time
 from abc import abstractmethod
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from pathlib import Path
+from math import ceil
 
 import pandas as pd
 from tqdm import tqdm  # for a progress bar
@@ -182,38 +183,27 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             time.sleep(4)  # Wait for 4 seconds before retrying
         return None # Could not get the page after 3 attempts
 
-    def _get_accepted_assignments(self, max_workers=8):
+    def _get_accepted_assignments(self):
         """
         Return a list of all accepted assignments
         """
-        start_page, per_page = 1, 30  # start at page 1, do 30 'items' per page
+        per_page = 30  # start at page 1, do 30 'items' per page
+        pages = ceil(self.accepted / 30.0)
         self.logger.debug("Getting pages of student repo data")
         accepted_assignments = [] # a list to hold all accepted assignments
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(self._get_page, page, per_page) \
-                                for page in range(start_page, start_page + max_workers)}
-            last_page = start_page + max_workers - 1
-            no_more_pages = False  # Flag to indicate when no more new pages should be fetched
+        pbar = tqdm(total=pages, desc="Getting pages of student repo data")
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(self._get_page, page, per_page) for page in range(1,pages+1)]
 
-            while futures:
-                for future in as_completed(futures.copy()):
-                    try:
-                        data = future.result()
-                        next_page = json.loads(data)
-                        if not next_page:
-                            # No more pages, set flag but continue processing remaining futures
-                            no_more_pages = True
-                        else:
-                            print(f"number of entries is {len(next_page)}")
-                            accepted_assignments += next_page  # add the next page of assignments to the list
-                    finally:
-                        futures.remove(future) # Remove the completed future
-
-                        # Start a new future for the next page only if no_more_pages flag is not set
-                        if not no_more_pages:
-                            last_page += 1
-                            futures.add(executor.submit(self._get_page, last_page, per_page))
+            for future in as_completed(futures):
+                output = future.result()
+                next_page = json.loads(output)
+                if next_page:
+                    accepted_assignments += next_page  # add the next page of assignments to the list
+                    pbar.update(1)
+        assert len(accepted_assignments) == self.accepted
+        pbar.close()
         return accepted_assignments
 
     def _get_changed_repos(self, accepted_assignments, commit_data_df):
