@@ -182,31 +182,38 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             time.sleep(4)  # Wait for 4 seconds before retrying
         return None # Could not get the page after 3 attempts
 
-    def _get_accepted_assignments(self):
+    def _get_accepted_assignments(self, max_workers=8):
         """
         Return a list of all accepted assignments
         """
-        page = 1
-        per_page = 100  # 100 'items' per page
-
-        self.logger.debug("Getting student repos data")
-
+        start_page, per_page = 1, 100  # start at page 1, do 100 'items' per page
+        self.logger.debug("Getting pages of student repo data")
         accepted_assignments = [] # a list to hold all accepted assignments
 
-        while True:
-            try:
-                output = self._get_page(page, per_page)
-                next_page = json.loads(output)
-                if not next_page:
-                    break # exit loop if no more assignments
-                accepted_assignments += next_page  # add the next page of assignments to the list
-                page += 1
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(self._get_page, page, per_page) \
+                                for page in range(start_page, start_page + max_workers)}
+            last_page = start_page + max_workers - 1
+            no_more_pages = False  # Flag to indicate when no more new pages should be fetched
 
-            except json.JSONDecodeError as e:
-                self.logger.addHandler(self.console_handler)
-                self.logger.error("Failed to decode JSON: %s", e)
-                self.logger.removeHandler(self.console_handler)
-                break
+            while futures:
+                for future in as_completed(futures.copy()):
+                    try:
+                        data = future.result()
+                        next_page = json.loads(data)
+                        if not next_page:
+                            # No more pages, set flag but continue processing remaining futures
+                            no_more_pages = True
+                        else:
+                            print(f"number of entries is {len(next_page)}")
+                            accepted_assignments += next_page  # add the next page of assignments to the list
+                    finally:
+                        futures.remove(future) # Remove the completed future
+
+                        # Start a new future for the next page only if no_more_pages flag is not set
+                        if not no_more_pages:
+                            last_page += 1
+                            futures.add(executor.submit(self._get_page, last_page, per_page))
         return accepted_assignments
 
     def _get_changed_repos(self, accepted_assignments, commit_data_df):
