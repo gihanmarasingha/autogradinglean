@@ -173,7 +173,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         * deal with rate limiting more intelligently.
         """
         self.logger.debug("Getting submissions page %s, with %s items per page", page, per_page)
-        command = f"/assignments/{self.id}/accepted_assignments?page={page}per_page={per_page}"
+        command = f"/assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}"
 
         for _ in range(3):  # Retry up to 3 times
             output = self._run_gh_api_command(command)
@@ -186,7 +186,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         """
         Return a list of all accepted assignments
         """
-        start_page, per_page = 1, 100  # start at page 1, do 100 'items' per page
+        start_page, per_page = 1, 30  # start at page 1, do 30 'items' per page
         self.logger.debug("Getting pages of student repo data")
         accepted_assignments = [] # a list to hold all accepted assignments
 
