@@ -15,6 +15,9 @@ class for assessing proofs written using the Lean interactive theorem prover.
 
 - [Installation](#installation)
 - [Package Overview](#overview)
+- [GitHubClassroomManager](#githubclassroommanager)
+- [GitHubClassroom](#githubclassroom)
+- [GitHubAssignment](#githubassignment)
 - [What is GitHub Classroom?](#what-is-github-classroom)
 - [Terminology](#terminology)
 - [License](#license)
@@ -233,7 +236,7 @@ The second kind of method is for reporting:
 
 * find_no_commit_candidates: find the candidates who have not made a submission for this assignment. Though the natural
   thing would be to test if 'commit_count' is zero, this doesn't always work (for reasons unbeknownst to me). That is,
-  sometimes a student will commit but the commit count will be zero. Apparently, issue has been fixed by GitHub
+  sometimes a student will commit but the commit count will be zero. Apparently, the issue has been fixed by GitHub
   Classroom.
 
   In any event, I will look for students where the last_commit_author is `github-classroom[bot]`.
@@ -267,6 +270,28 @@ of the classroom directory. It is named assignmentXXXXXX, where XXXXXX is the as
   a 'final_grade' which is the maximum of the manual grade and the autograder result.
 * A file `no_commitsXXX.xlsx` is placed in the `query_output` subdirectory when you run `find_no_commit_candidates()`.
   This shows those candidates who have accepted the assignment but have not yet made a commit.
+
+### Example run
+
+Let's suppose you have created a `GitHubClassroom` object called `myclass` in the previous example run. You ran
+`myclass.list_assignments()` to get a list of the assignments. Suppose you discovered that the assignment you wish to
+mark has id `123123`. You can perform all the autograding functions simply as follows:
+
+      ass = myclass.assignments[123123]
+      ass.autograde()
+
+If more students submit after you have run the all-one-one autograde command, you can download the new repos and
+grade them as follows:
+
+      ass.get_student_repos()
+      ass.configure_student_repos()
+      ass.run_autograding()
+
+To find the students who have accepted the assignment but not committed, run
+
+      ass.find_no_commit_candidates()
+
+
 
 ## What is GitHub Classroom?
 
