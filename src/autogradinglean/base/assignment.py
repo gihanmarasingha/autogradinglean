@@ -14,8 +14,8 @@ import json
 import time
 from abc import abstractmethod
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from pathlib import Path
 from math import ceil
+from pathlib import Path
 
 import pandas as pd
 from tqdm import tqdm  # for a progress bar
@@ -23,8 +23,10 @@ from tqdm import tqdm  # for a progress bar
 from autogradinglean.base.base import GitHubClassroomQueryBase
 from autogradinglean.base.classroom import GitHubClassroom
 
+
 class GitHubAssignment(GitHubClassroomQueryBase):
     """Represents a GitHub assignment and provides methods for downloading repositories, autograding, etc."""
+
     def __init__(self, assignment_id, parent_classroom: GitHubClassroom):
         self.id = assignment_id
         self.parent_classroom = parent_classroom  # Reference to the parent GitHubClassroom object
@@ -34,8 +36,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         self._queries_dir = self.assignment_dir / "query_output"
         logger_name = f"GitHubAssignment{self.id}"
         log_file = self.assignment_dir / f"assignment{self.id}.log"
-        self.logger, self.file_handler, self.console_handler = \
-            self._initialise_logger(logger_name, log_file, debug = parent_classroom.debug)
+        self.logger, self.file_handler, self.console_handler = self._initialise_logger(
+            logger_name, log_file, debug=parent_classroom.debug
+        )
         # self.df_grades = pd.DataFrame()  # DataFrame to hold grades
         self.fetch_assignment_info()  # Fetch assignment info during initialization
 
@@ -59,9 +62,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         try:
             assignment_data = json.loads(output)
-            #self.slug = assignment_data.get("slug")
+            # self.slug = assignment_data.get("slug")
             self.accepted = assignment_data.get("accepted")  # the number of accepted submissions
-            #self.title = assignment_data.get("title")
+            # self.title = assignment_data.get("title")
             self.type = assignment_data.get("type")
             self.starter_code_repository = assignment_data.get("starter_code_repository", {}).get("full_name")
             self.deadline = assignment_data.get("deadline")
@@ -142,8 +145,12 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         # TODO: think about how the following is affected by different time zones and locales.
         git_log_command = [
-            "git", "log",  "-1",  r"--format=%cd,%an",
-            r"--date=format-local:%d/%m/%y,%H:%M:%S", r"src/assignment.lean"
+            "git",
+            "log",
+            "-1",
+            r"--format=%cd,%an",
+            r"--date=format-local:%d/%m/%y,%H:%M:%S",
+            r"src/assignment.lean",
         ]
         git_log_result = self._run_command(git_log_command, cwd=student_repo_path)
 
@@ -181,7 +188,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             if output is not None:
                 return output
             time.sleep(4)  # Wait for 4 seconds before retrying
-        return None # Could not get the page after 3 attempts
+        return None  # Could not get the page after 3 attempts
 
     def _get_accepted_assignments(self):
         """
@@ -190,11 +197,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         per_page = 30  # start at page 1, do 30 'items' per page
         pages = ceil(self.accepted / 30.0)
         self.logger.debug("Getting pages of student repo data")
-        accepted_assignments = [] # a list to hold all accepted assignments
+        accepted_assignments = []  # a list to hold all accepted assignments
 
         pbar = tqdm(total=pages, desc="Getting pages of student repo data")
         with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(self._get_page, page, per_page) for page in range(1,pages+1)]
+            futures = [executor.submit(self._get_page, page, per_page) for page in range(1, pages + 1)]
 
             for future in as_completed(futures):
                 output = future.result()
@@ -210,7 +217,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         """
         Determine which student repos are new or have been changed since the last run
         """
-        changed_repos = [] # a list of repos which are new or have been changed
+        changed_repos = []  # a list of repos which are new or have been changed
         for submission in accepted_assignments:
             repo_info = submission.get("repository", {})
             student_repo_name = repo_info.get("full_name", "").split("/")[-1]
@@ -242,9 +249,10 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         pbar = tqdm(total=len(changed_repos), desc="Getting student repos")
 
         with ThreadPoolExecutor() as executor:
-            futures = [executor.submit \
-                    (self._get_student_repo, submission, student_repos_dir, pbar) \
-                    for submission in changed_repos]
+            futures = [
+                executor.submit(self._get_student_repo, submission, student_repos_dir, pbar)
+                for submission in changed_repos
+            ]
 
             for future in as_completed(futures):
                 new_row = future.result()
@@ -305,8 +313,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         # Filter student data
         df_student_data_filtered = self.parent_classroom.df_student_data[
-            ~self.parent_classroom.df_student_data \
-                [self.parent_classroom.config["candidate_file"]["candidate_id_col"]].isna()
+            ~self.parent_classroom.df_student_data[
+                self.parent_classroom.config["candidate_file"]["candidate_id_col"]
+            ].isna()
         ]
 
         # Merge the dataframes
@@ -373,8 +382,10 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         # Loop through each student repo
 
         with ProcessPoolExecutor() as executor:
-            futures = [executor.submit(type(self)._grade_repo, row, self.assignment_dir, df_grades) \
-                       for _, row in commit_data_df.iterrows()]
+            futures = [
+                executor.submit(type(self)._grade_repo, row, self.assignment_dir, df_grades)
+                for _, row in commit_data_df.iterrows()
+            ]
 
             for future in as_completed(futures):
                 result = future.result()
@@ -433,7 +444,11 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             how="inner",
         )
         df_no_commits = df_no_commits[
-            ["identifier", "github_username", *self.parent_classroom.config["candidate_file"]["output_cols"], \
-             "student_repo_name"]
+            [
+                "identifier",
+                "github_username",
+                *self.parent_classroom.config["candidate_file"]["output_cols"],
+                "student_repo_name",
+            ]
         ]
         self.save_query_output(df_no_commits, "no_commits", excel=True)

@@ -18,6 +18,7 @@ from autogradinglean.base.assignment import GitHubAssignment
 # 2.2) Write to all candidates with a github username / classroom roster link to check the link is correct
 #       (classroom level)
 
+
 class GitHubAssignmentLean3(GitHubAssignment):
     """
     Represents a GitHub assignment and provides methods for downloading repositories, autograding, etc.\
@@ -84,8 +85,7 @@ class GitHubAssignmentLean3(GitHubAssignment):
     @staticmethod
     def _run_grading_command(repo_path):
         result = subprocess.run(
-            ["lean", ".evaluate/evaluate.lean"],
-            capture_output=True, text=True, shell=False, check=False, cwd=repo_path
+            ["lean", ".evaluate/evaluate.lean"], capture_output=True, text=True, shell=False, check=False, cwd=repo_path
         ).stdout
 
         if "sorry" not in result and "error" not in result:

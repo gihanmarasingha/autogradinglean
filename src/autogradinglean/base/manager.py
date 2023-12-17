@@ -9,6 +9,7 @@ from autogradinglean.base.base import GitHubClassroomBase
 
 class GitHubClassroomManager(GitHubClassroomBase):
     """A class for representing all classrooms for the current user"""
+
     def __init__(self):
         self.classrooms = pd.DataFrame()
         self.fetch_classrooms()

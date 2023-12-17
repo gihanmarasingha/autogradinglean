@@ -29,6 +29,7 @@ from datetime import datetime, timezone  # for attaching date and time to filena
 #
 #   https://pygithub.readthedocs.io/en/stable/examples/Authentication.html#app-authentication
 
+
 class GitHubClassroomBase:
     """Provides methods to be used in derived classes for running subprocess and outputing query results"""
 
@@ -48,7 +49,7 @@ class GitHubClassroomBase:
     def _run_gh_api_command_base(command, logger=None):
         """Runs a command through the GitHub api via the `gh` CLI. This command pretty prints its ouput. Thus,
         we postprocess by removing ANSI escape codes."""
-        gh_api = ["gh","api", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"]
+        gh_api = ["gh", "api", "-H", "Accept: application/vnd.github+json", "-H", "X-GitHub-Api-Version: 2022-11-28"]
         try:
             raw_ouput = GitHubClassroomBase._run_command_base([*gh_api, command], logger=logger)
             return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
@@ -56,8 +57,10 @@ class GitHubClassroomBase:
             logger.debug("Encountered TypeError %s", e)
             return None
 
+
 class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
     """Abstract base class for classes that output query results and performs logging"""
+
     @property
     @abstractmethod
     def queries_dir(self):
@@ -87,7 +90,7 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
         else:
             df_query_output.to_csv(file_path, index=False)
 
-    def _initialise_logger(self, logger_name, log_file, *, debug = False):
+    def _initialise_logger(self, logger_name, log_file, *, debug=False):
         logger = logging.getLogger(logger_name + uuid.uuid4().hex)
         if debug is True:
             logging_level = logging.DEBUG

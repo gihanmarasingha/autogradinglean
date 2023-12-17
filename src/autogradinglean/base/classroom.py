@@ -13,6 +13,7 @@ import toml
 
 from autogradinglean.base.base import GitHubClassroomQueryBase
 
+
 class GitHubClassroom(GitHubClassroomQueryBase):
     """Class that encapsulates a GitHub Classroom. Contains GitHubAssignment objects
     exposes functions for reporting on unlinked candidates and other useful information.
@@ -42,8 +43,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     * candidate_id_col is the name of the column in 'filename' that gives the GitHub student identifiers,
     * output_cols is a list of 'filename' columns that should be output by certain queries.
     """
-    def __init__(self, marking_root_dir, *, debug = False):
-        self.assignments = {} # Dictionary to hold GitHubAssignment objects
+
+    def __init__(self, marking_root_dir, *, debug=False):
+        self.assignments = {}  # Dictionary to hold GitHubAssignment objects
         self.marking_root_dir = Path(marking_root_dir).expanduser()
         # Check if marking_root_dir exists
         if not self.marking_root_dir.exists():
@@ -53,8 +55,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         logger_name = "GitHubClassroom"
         log_file = self.marking_root_dir / "classroom.log"
         self.debug = debug
-        self.logger, self.file_handler, self.console_handler = \
-            self._initialise_logger(logger_name, log_file, debug = self.debug)
+        self.logger, self.file_handler, self.console_handler = self._initialise_logger(
+            logger_name, log_file, debug=self.debug
+        )
 
         self.df_classroom_roster = self.df_candidates = None
         self.config = None
@@ -98,7 +101,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
     def get_assignment_by_title(self, title):
         """Returns the first assignment with the given title (if it exists)"""
-        ids =self._df_assignments[self._df_assignments["title"]==title]["id"]
+        ids = self._df_assignments[self._df_assignments["title"] == title]["id"]
         self.logger.debug("Trying to get assignment titled %s", title)
         return self.assignments[ids.iloc[0]]
 
@@ -106,7 +109,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
     def queries_dir(self):
         return self._queries_dir
 
-    def _load_config_from_toml(self,config_file_path):
+    def _load_config_from_toml(self, config_file_path):
         """Loads data from a toml file"""
         try:
             config = toml.load(config_file_path)
@@ -144,15 +147,17 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         df_candidates = self.df_candidates
 
         self.df_student_data = pd.merge(
-            df_classroom_roster, df_candidates, left_on="identifier", \
-                right_on=self.config["candidate_file"]["candidate_id_col"], how="outer"
+            df_classroom_roster,
+            df_candidates,
+            left_on="identifier",
+            right_on=self.config["candidate_file"]["candidate_id_col"],
+            how="outer",
         )
 
     def _get_class(self, full_class_name):
         module_name, class_name = full_class_name.rsplit(".", 1)
         module = importlib.import_module(module_name)
         return getattr(module, class_name)
-
 
     def _create_assignment(self, assignment_id, default_type, assignment_types):
         """Function to create a GitHubAssignment instance."""
@@ -167,8 +172,10 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         assignment_types = self.config.get("assignment_types", {})
         with ThreadPoolExecutor() as executor:
             # Create a future for each assignment
-            futures = [executor.submit(self._create_assignment, row["id"], default_type, assignment_types) \
-                       for _, row in self._df_assignments.iterrows()]
+            futures = [
+                executor.submit(self._create_assignment, row["id"], default_type, assignment_types)
+                for _, row in self._df_assignments.iterrows()
+            ]
 
             # As each future completes, add the assignment to the dictionary
             for future in as_completed(futures):
@@ -185,8 +192,9 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
         self.logger.info("Finding missing roster identifiers")
         mask = self.df_student_data["identifier"].isna()
-        missing_roster_ids = self.df_student_data.loc[mask, [self.config["candidate_file"]["candidate_id_col"], \
-                                                             *self.config["candidate_file"]["output_cols"]]]
+        missing_roster_ids = self.df_student_data.loc[
+            mask, [self.config["candidate_file"]["candidate_id_col"], *self.config["candidate_file"]["output_cols"]]
+        ]
         self.save_query_output(missing_roster_ids, "missing_roster_ids", excel=True)
         return missing_roster_ids
 
@@ -201,8 +209,14 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         (2) just ignore the issue
         """
         # Rows where 'identifier' is NaN will be the ones that are in df_candidates but not in df_classroom_roster
-        merged_df = pd.merge(self.df_classroom_roster,self.df_candidates, left_on="identifier", \
-                             right_on=self.config["candidate_file"]["candidate_id_col"], how="left", indicator=True)
+        merged_df = pd.merge(
+            self.df_classroom_roster,
+            self.df_candidates,
+            left_on="identifier",
+            right_on=self.config["candidate_file"]["candidate_id_col"],
+            how="left",
+            indicator=True,
+        )
         no_match_df = merged_df[merged_df["_merge"] == "left_only"]
         missing_candidates = no_match_df.drop(columns=self.df_candidates.columns.to_list() + ["_merge"])
         self.save_query_output(missing_candidates, "missing_candidates", excel=True)
@@ -210,10 +224,13 @@ class GitHubClassroom(GitHubClassroomQueryBase):
 
     def find_unlinked_candidates(self):
         """Returns those candidates who have not linked their GitHub account with the roster"""
-        mask = self.df_student_data["github_username"].isna() & \
-            self.df_student_data[self.config["candidate_file"]["candidate_id_col"]].notna()
-        unlinked_candidates = self.df_student_data.loc[mask, [self.config["candidate_file"]["candidate_id_col"], \
-                                                              *self.config["candidate_file"]["output_cols"]]]
+        mask = (
+            self.df_student_data["github_username"].isna()
+            & self.df_student_data[self.config["candidate_file"]["candidate_id_col"]].notna()
+        )
+        unlinked_candidates = self.df_student_data.loc[
+            mask, [self.config["candidate_file"]["candidate_id_col"], *self.config["candidate_file"]["output_cols"]]
+        ]
         self.logger.info("Finding unlinked candidates")
         self.save_query_output(unlinked_candidates, "unlinked_candidates", excel=True)
         return unlinked_candidates

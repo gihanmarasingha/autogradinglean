@@ -20,6 +20,7 @@ class for assessing proofs written using the Lean interactive theorem prover.
 - [GitHubAssignment](#githubassignment)
 - [What is GitHub Classroom?](#what-is-github-classroom)
 - [Terminology](#terminology)
+- [Building the package](#building-the-package)
 - [License](#license)
 
 ## Installation
@@ -389,6 +390,83 @@ There are a few problems with this system:
   It also contains a set of student repositories, submission times, and associated grading information, if relevant.
 * **starter repository**: a template repository used as the basis of each student repository.
 
+## The Hatch build process
+
+I use [Hatch](https://hatch.pypa.io) for building, linting, (and later testing).
+You might want to run hatch within a virtual environment. In which case first create a virtual environment by navigating to the source root and typing
+
+    python -m venv .venv
+
+Then type
+
+    source .venv/bin/activate
+
+to activate the environment.
+
+The configruation file, `pyproject.toml` was automatically built by Hatch when I ran `hatch new autogradinglean`.
+
+This file defines two environments: `default`, used for building and testing, and `lint`, for linting.
+
+### Building
+
+To build, just navigate to the source root and type
+
+    hatch build
+
+This creates both a source distribution, called something like
+
+    dist/autogradinglean-x.x.x.tar.gz
+
+and a 'wheel' package called
+
+    dist/autogradinglean-x.x.x-py3-none-any.whl
+
+To try out the local package first uninstall any copies using
+
+    pip uninstall autogradinglean
+
+then install the wheel package (say) using
+
+    pip install dist/autogradinglean-x.x.x-py3-none-any.whl
+
+replacing x.x.x with the appropriate version number.
+
+### Running a linter
+
+The scripts `all`, `fmt`, `style`, and `typing` are defined in the Hatch `lint` environment. For instnace, to run
+the `style` script, just type
+
+    hatch run lint:style
+
+at the command prompt.
+
+* `typing`: runs the `mypy` type checker,
+* `style`: runs the `ruff` linter and formatter, runs the `black` formatter in 'check' mode,
+* `fmt`: as with `style` but more vigorous! That is, it tries to fix issues found by ruff and black.
+
+### Versioning
+
+You can update the micro version using
+
+    hatch version micro
+
+
+or the minor version using
+
+    hatch version minor
+
+or the major version using
+
+    hatch version major
+
+All this does is increment the corresponding version number in the file referred to in the `[tool.hatch.version]`
+section of `pyproject.toml`.
+
+### Publishing
+
+You can publish using
+
+    hatch publish
 
 ## License
 
