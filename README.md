@@ -468,6 +468,12 @@ You can publish using
 
     hatch publish
 
+to publish to the main PyPI or
+
+    hatch publish -r test
+
+to publish to the test repo.
+
 ## License
 
 `autogradinglean` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
