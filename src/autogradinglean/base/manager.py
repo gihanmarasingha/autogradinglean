@@ -14,6 +14,8 @@ class GitHubClassroomManager(GitHubClassroomBase):
         self.classrooms = pd.DataFrame()
         self.fetch_classrooms()
 
+    # TODO modify the code below so it can deal with more than one page of classrooms.
+    # See the functions _get_page and _get_accepted_assignments in the assignments module.
     def fetch_classrooms(self):
         """Get all classroom data"""
         command = "/classrooms"
