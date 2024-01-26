@@ -15,6 +15,7 @@ class for assessing proofs written using the Lean interactive theorem prover.
 
 - [Installation](#installation)
 - [Package Overview](#overview)
+- [Workflow](#workflow)
 - [GitHubClassroomManager](#githubclassroommanager)
 - [GitHubClassroom](#githubclassroom)
 - [GitHubAssignment](#githubassignment)
@@ -77,6 +78,69 @@ Currently, the package interacts with GitHub Classroom primarily by creating sub
 CLI with the classroom extension. This is why the [installation](#installation) instructions require `gh`.
 
 Primarily, I use `gh` together with the [Classroom REST API](https://docs.github.com/en/rest/classroom/classroom?apiVersion=2022-11-28).
+
+## Workflow
+
+I'll present a sample workflow. Further details are to be found in the sections concerning each
+individual class.
+
+First, follow the [installation](#installation) instructions above to install this package, the GitHub
+CLI and its Classroom extension.
+
+### Preparing the classroom directory
+
+In this example, I will imagine that you wish to perform autograding for a GitHub Classroom called 'RealAnalysis2022'.
+All the data (student repositories, assignment repositories, student record information, autograding output, log files)
+related to this class will be stored locally in a *classroom directory* of your choosing. Let's suppose you have chosen
+to use the local directory (aka folder) `~/myclassdir`.
+
+You'll need two data files to start: a student record spreadsheet from your institution's student record system, and
+a 'classroom roster' extracted from the GitHub Classroom web interface. Read the sections on
+[setting up a classroom](#setting-up-a-classroom) and [establishing the roster mapping](#establishing-the-roster-mapping)
+to get started.
+
+Download the classroom roster (usually called 'classroom_roster.csv')
+
+
+
+### Creating the configuration file
+
+Open up a Python interpreter / Jupyter notebook and run
+
+    from autogradinglean import GitHubClassroomManager
+
+    rooms = GitHubClassroomManager()
+    rooms.classrooms
+
+This prints out the contents of a DataFrame that represents your Clasrooms. Here's some sample output.
+
+|     |      id | name                 | archived | url                                                        |
+|----:|--------:|:---------------------|:---------|:-----------------------------------------------------------|
+|   0 |  185646 | RealAnalysis2022     | False    | https://classroom.github.com/classrooms/536356...           |
+|   1 |  174746 | QuantumPhysics2021   | False    | https://classroom.github.com/classrooms/536356...           |
+|   2 |  135873 | Ikebana2023          | False    | https://classroom.github.com/classrooms/536356...           |
+
+This user has three Classrooms. Let's suppose you want to perform autograding for the 'RealAnalysis2022' Classroom. Make
+a note of the Classroom ID (here 185646) and create somewhere on your local filesystem a directory to hold all the
+data. In this example, we'll assume you have chosen to use `~/myclassdir` as your classroom directory.
+
+In this directory, create a [configuration file](#configuration-file). 
+
+    [classroom_data]
+    classroom_id = "185646"
+    classroom_roster_csv = "classroom_roster.csv"
+
+    [candidate_file]
+    filename = "STUDENT_DATA.csv"
+    candidate_id_col = "Candidate No"
+    output_cols = ["Forename", "Surname", "Email Address"]
+
+    [assignment_types]
+    default = "autogradinglean.lean3.assignment.GitHubAssignmentLean3"
+
+
+
+
 
 
 ## GitHubClassroomManager
@@ -190,7 +254,7 @@ time suffix to the filename. These can be safely edited or deleted as desired.
 Actions are logged to `classroom.log`. For additional logging information, initialialse a GitHubClassroom object with
 the argument `debug = True`. For example
 
-  myclass = GitHubClassroom('myrootdir', debug=True)
+    myclass = GitHubClassroom('myrootdir', debug=True)
 
 ### Example run
 
@@ -344,13 +408,21 @@ GitHub accounts and student identifiers. The roster serves this purpose. Though 
 create this mapping manually, it is simpler to leave the task to each student, as I shall now
 describe.
 
-First, create a 'test submission' assignment, as described below. Publish the URL of the assignment
+First, create a 'test submission' assignment. Publish the URL of the assignment
 (the 'invitation link') to the students on your module. When a student accepts the assignment, they
 will be asked to select their roster identifier from a list of roster identifiers.
+
+You may subsequently **download** the roster file by navigating to your Classroom in the GitHub Classroom web UI,
+selecting the 'students' tab, then 'Download'. 
 
 **Problem**: a student may easily select the wrong roster identifier. It is therefore incumbent on
 the instructor to email each student, asking them to check that the association of roster identifier
 to GitHub username is correct. Mail merge can be used for this purpose. This package helps in preparing a mail merge.
+
+**An alternative** is to use your institution's Learning Management System to create a (non-GitHub) assignment in which
+the student is required to submit their GitHub username. The instructor may then use the resulting information to
+create a roster mapping manually. This alternative has the advantage that a student cannot choose an incorrect 
+roster identifier / student identifier, but they can submit an incorrect GitHub username! 
 
 
 ### Local versus remote autograding
@@ -393,7 +465,8 @@ There are a few problems with this system:
 ## The Hatch build process
 
 I use [Hatch](https://hatch.pypa.io) for building, linting, (and later testing).
-You might want to run hatch within a virtual environment. In which case first create a virtual environment by navigating to the source root and typing
+You might want to run hatch within a virtual environment. In which case first create a virtual environment by navigating
+to the source root and typing
 
     python -m venv .venv
 
