@@ -99,9 +99,8 @@ a 'classroom roster' extracted from the GitHub Classroom web interface. Read the
 [setting up a classroom](#setting-up-a-classroom) and [establishing the roster mapping](#establishing-the-roster-mapping)
 to get started.
 
-Download the classroom roster (usually called 'classroom_roster.csv')
-
-
+Download the classroom roster (usually called 'classroom_roster.csv') and place it `~/myclassdir`. Likewise get the
+file from your student record system (say 'realanalysis_students.csv') and place it in the same directory.
 
 ### Creating the configuration file
 
@@ -131,17 +130,54 @@ In this directory, create a [configuration file](#configuration-file).
     classroom_roster_csv = "classroom_roster.csv"
 
     [candidate_file]
-    filename = "STUDENT_DATA.csv"
+    filename = "realanalysis_students.csv"
     candidate_id_col = "Candidate No"
     output_cols = ["Forename", "Surname", "Email Address"]
 
     [assignment_types]
     default = "autogradinglean.lean3.assignment.GitHubAssignmentLean3"
 
+Save this file as `config.toml` in the above directory.
 
+### Viewing the assignments
 
+Fire up a Python interpreter (note: you may have issues with Jupyter or VSCode). Run
 
+      from autogradinglean import GitHubClassroom
+      myclass = GitHubClassroom('~/myclassdir')
+      myclass.list_assignments()
 
+You should get output something like the following:
+
+|   id   | public_repo |          title           |    type    | passing | language |       deadline        | classroom                                   |
+|--------|-------------|--------------------------|------------|---------|----------|-----------------------|---------------------------------------------|
+| 672636 | False       | Test submission          | individual | 206     | None     | 2023-10-10T11:00:00Z  | {'id': 185646, 'name': 'RealAnalysis2022 ', ... |
+| 683736 | False       | Limits        | individual | 210       | None     | 2023-10-10T11:00:00Z  | {'id': 185646, 'name': 'RealAnalysis2022', ... |
+| 975363 | False       | Continuity        | individual | 220     | None     | 2023-11-10T17:00:00Z  | {'id': 185646, 'name': 'RealAnalysis2022', ... |
+
+The package will also create a subfolder of `~/myclassdir`, one for each assignment.
+
+### Working with an assignment
+
+We now seek to autograde the assignment 'Limits', with ID 683736. Continuing the Python session from above, type
+
+    assn = myclass.assignments[683736]
+    assn.autograde()
+
+Note that `assn` knows its ID via `assn.id`. The autograding completes and produces several output files in the folder
+`~/myclassdir/assignment683736`.
+
+The important files are: `grades.csv` and date-and-time-stamped files that look like `grades20231023_1634_02.xlsx` in
+the `query_output` subfolder of the above folder.
+
+The file `grades.csv` contains the up-to-date list of grades for assignment 683736. It contains columns 'manual_grade'
+and 'comment'. These are for assigning partial marks in instances where the autograder awards zero.
+
+Each file with a name like `grades20231023_1634_02.xlsx` gives a snapshot of the autograded mark, combined with the data
+from your student record system. The grades in the this snapshot takes the maximum of the autograded mark together with
+the manual mark from `grades.csv`.
+
+I f you edit `grades.csv` with manual mark, you must re-run the autograder to create a new snapshot grade file.
 
 ## GitHubClassroomManager
 
@@ -218,7 +254,7 @@ be a file `config.toml`. Here is a sample config file:
   roster and from your student record system. This method is called automatically on initialisation of a
   GitHubClassroom object. You *should* also call the method if your config file or any of the referenced data files
   change.
-* get_assignment_by_title(ass_title): returns a GitHubAssignment whose title is ass_title. It is preferable to use
+* get_assignment_by_title(assn_title): returns a GitHubAssignment whose title is assn_title. It is preferable to use
   assignment IDs rather than titles as titles can be changed.
 * find_missing_roster_identifiers(): returns a DataFrame of those students who are in the candidate file but not in
   in the classroom roster. This usually indicates students who have enrolled since the roster was last updated.
@@ -342,19 +378,19 @@ Let's suppose you have created a `GitHubClassroom` object called `myclass` in th
 `myclass.list_assignments()` to get a list of the assignments. Suppose you discovered that the assignment you wish to
 mark has id `123123`. You can perform all the autograding functions simply as follows:
 
-      ass = myclass.assignments[123123]
-      ass.autograde()
+      assn = myclass.assignments[123123]
+      assn.autograde()
 
 If more students submit after you have run the all-one-one autograde command, you can download the new repos and
 grade them as follows:
 
-      ass.get_student_repos()
-      ass.configure_student_repos()
-      ass.run_autograding()
+      assn.get_student_repos()
+      assn.configure_student_repos()
+      assn.run_autograding()
 
 To find the students who have accepted the assignment but not committed, run
 
-      ass.find_no_commit_candidates()
+      assn.find_no_commit_candidates()
 
 
 
@@ -546,6 +582,11 @@ to publish to the main PyPI or
     hatch publish -r test
 
 to publish to the test repo.
+
+## Known issues and limitations
+
+* The package functions will fail if you have no network connection to GitHub.
+* The parallel processing code used in autograding can fail when run in some interactive environments.
 
 ## License
 
