@@ -297,7 +297,12 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         """
 
     def _save_grades(self, df_grades, grades_file):
-        # Save the updated DataFrame
+        """Saves the df_grades DataFrame to a CSV file then merges with the student data and saves to an Excel file."""
+
+        # TODO: ensure that the grade output excel file contains no duplicates
+        # Question: what happens if several different marks are given for the same student and the same assignment?
+
+        # Save the updated DataFrame to a CSV file
         df_grades.to_csv(grades_file, index=False)
 
         # Filter rows where 'last_commit_author' is not 'github-classroom[bot]'
@@ -406,7 +411,6 @@ class GitHubAssignment(GitHubClassroomQueryBase):
 
         pbar.close()
         self.logger.info("...autograding complete")
-
         self._save_grades(df_grades, grades_file)
 
     def autograde(self):
