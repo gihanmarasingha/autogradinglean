@@ -22,6 +22,7 @@ class for assessing proofs written using the Lean interactive theorem prover.
 - [What is GitHub Classroom?](#what-is-github-classroom)
 - [Terminology](#terminology)
 - [Building the package](#building-the-package)
+- [Known issues and limitations](#known-issues-and-limitations)
 - [License](#license)
 
 ## Installation
@@ -586,7 +587,9 @@ to publish to the test repo.
 ## Known issues and limitations
 
 * The package functions will fail if you have no network connection to GitHub.
-* The parallel processing code used in autograding can fail when run in some interactive environments.
+* The parallel processing code used in autograding can fail when run in some interactive environments. If you get a
+  `BrokenProcessPool` error when running the code in IPython / Jupyter, try running from the standard Python REPL
+  instead.
 
 ## License
 
