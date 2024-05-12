@@ -178,7 +178,20 @@ Each file with a name like `grades20231023_1634_02.xlsx` gives a snapshot of the
 from your student record system. The grades in the this snapshot takes the maximum of the autograded mark together with
 the manual mark from `grades.csv`.
 
-I f you edit `grades.csv` with manual mark, you must re-run the autograder to create a new snapshot grade file.
+If you edit `grades.csv` with manual mark, you must re-run the autograder to create a new snapshot grade file.
+
+### Manual marking
+
+This is a suggested workflow for manual grading, based on the Lean autograder.
+
+First open an assignment's `grades.csv` file using Microsoft Excel. Select all columns and filter. Sort by `grade` (ascending) and then filter out submissions with a `commit_count` of 0. These are students who didn't submit any work.
+
+You are left with candidates who submitted, ordered by grade. Typically, you will manually grade those students who scored 0. Use the `github_username` column to identify students in
+the `student_repos` subfolder of the assignment folder.
+
+Open the candidate's folder (say in VSCode) and determine the grade. Add this in the `manual_grade` column of the csv file, together with any comment.
+
+
 
 ## GitHubClassroomManager
 
@@ -590,6 +603,7 @@ to publish to the test repo.
 * The parallel processing code used in autograding can fail when run in some interactive environments. If you get a
   `BrokenProcessPool` error when running the code in IPython / Jupyter, try running from the standard Python REPL
   instead.
+* If you carry out manual marking, there may be issues if you don't save the `grades.csv` file using the UTF-8 encoding.
 
 ## License
 
