@@ -59,8 +59,9 @@ The classes are:
   GitHub username. It can also find candidates who have enrolled (or unenrolled) since you set up the roster.
 
   This is also a container class, containing one GitHubAssignment object per assignment.
-* GitHubAssignment: an abstract class that represents a GitHub Classroom assignment. Through this module, you can get the starter
-  repository and the set of student repositories. You can perform local autograding, adding manual marks and comments.
+* GitHubAssignment: an abstract class that represents a GitHub Classroom assignment. Through this module, you can get
+  the starter repository and the set of student repositories. You can perform local autograding, adding manual marks and
+  comments.
 
   This class reports on those candidates who have not made and pushed a commit to their student repository.
 
@@ -184,14 +185,15 @@ If you edit `grades.csv` with manual mark, you must re-run the autograder to cre
 
 This is a suggested workflow for manual grading, based on the Lean autograder.
 
-First open an assignment's `grades.csv` file using Microsoft Excel. Select all columns and filter. Sort by `grade` (ascending) and then filter out submissions with a `commit_count` of 0. These are students who didn't submit any work.
+First open an assignment's `grades.csv` file using Microsoft Excel. Select all columns and filter. Sort by `grade`
+(ascending) and then filter out submissions with a `commit_count` of 0. These are students who didn't submit any work.
 
-You are left with candidates who submitted, ordered by grade. Typically, you will manually grade those students who scored 0. Use the `github_username` column to identify students in
-the `student_repos` subfolder of the assignment folder.
+You are left with candidates who submitted, ordered by grade. Typically, you will manually grade those students who
+scored 0. Use the `github_username` column to identify students in the `student_repos` subfolder of the assignment
+folder.
 
-Open the candidate's folder (say in VSCode) and determine the grade. Add this in the `manual_grade` column of the csv file, together with any comment.
-
-
+Open the candidate's folder (say in VSCode) and determine the grade. Add this in the `manual_grade` column of the csv
+file, together with any comment.
 
 ## GitHubClassroomManager
 
@@ -604,6 +606,13 @@ to publish to the test repo.
   `BrokenProcessPool` error when running the code in IPython / Jupyter, try running from the standard Python REPL
   instead.
 * If you carry out manual marking, there may be issues if you don't save the `grades.csv` file using the UTF-8 encoding.
+* The commit information in `grades.csv` (last_commit_date, last_commit_time, last_commit_author) may be incorrect if
+  the candidate commits in a way that does not cause the GitHub Classroom workflow to run.
+
+  For instance, you may have set up your workflow to run only when the commit alters a particular file in the
+  repository. If the candidate changes the filename, the workflow won't run.
+
+  One workaround is to view the commit information using `git log` and make an appropriate modification to `grades.csv`.
 
 ## License
 
