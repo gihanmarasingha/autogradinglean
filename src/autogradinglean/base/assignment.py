@@ -303,7 +303,7 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         # Question: what happens if several different marks are given for the same student and the same assignment?
 
         # Save the updated DataFrame to a CSV file
-        df_grades.to_csv(grades_file, index=False)
+        df_grades.to_csv(grades_file, index=False, encoding = 'utf-8')
 
         # Filter rows where 'last_commit_author' is not 'github-classroom[bot]'
         condition = df_grades["last_commit_author"] != "github-classroom[bot]"

@@ -606,6 +606,7 @@ to publish to the test repo.
   `BrokenProcessPool` error when running the code in IPython / Jupyter, try running from the standard Python REPL
   instead.
 * If you carry out manual marking, there may be issues if you don't save the `grades.csv` file using the UTF-8 encoding.
+  If you get a `UnicodeDecodeError`, then resave your `grades.csv` file in UTF-8.
 * The commit information in `grades.csv` (last_commit_date, last_commit_time, last_commit_author) may be incorrect if
   the candidate commits in a way that does not cause the GitHub Classroom workflow to run.
 
