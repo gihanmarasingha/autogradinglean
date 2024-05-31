@@ -86,7 +86,7 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
 
         # Save the DataFrame to Excel
         if excel:
-            df_query_output.to_excel(file_path, index=False, encoding = 'utf-8')
+            df_query_output.to_excel(file_path, index=False)
         else:
             df_query_output.to_csv(file_path, index=False, encoding = 'utf-8')
 
