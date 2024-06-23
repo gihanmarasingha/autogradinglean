@@ -72,12 +72,14 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to decode JSON: %s", e)
             self.logger.removeHandler(self.console_handler)
-            raise RuntimeError("Failed to decode JSON") from e
+            msg = "Failed to decode JSON"
+            raise RuntimeError(msg) from e
         except RuntimeError as e:
             self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to get assignment information: %s", e)
             self.logger.removeHandler(self.console_handler)
-            raise RuntimeError("Failed to get assignment information") from e
+            msg = "Failed to get assignment information"
+            raise RuntimeError(msg) from e
         self.logger.info("Received assignment information")
 
     def get_starter_repo(self):
@@ -97,7 +99,8 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to get starter repository: %s", e)
             self.logger.removeHandler(self.console_handler)
-            raise RuntimeError("Failed to get starter repository") from e
+            msg = "Failed to get starter repository"
+            raise RuntimeError(msg) from e
 
         self.logger.info("Retrieved starter repository.")
 

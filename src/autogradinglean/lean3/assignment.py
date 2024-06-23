@@ -61,7 +61,8 @@ class GitHubAssignmentLean3(GitHubAssignment):
                     self._get_mathlib(starter_repo_path)
                 except RuntimeError as e:
                     self.logger.error("Failed to configure the starter repository.")
-                    raise RuntimeError("Failed to configure the starter repository.") from e
+                    msg = "Failed to configure the starter repository."
+                    raise RuntimeError(msg) from e
 
                 self.logger.info("...successfully configured the starter repository.")
             else:

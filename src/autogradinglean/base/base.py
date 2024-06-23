@@ -45,7 +45,8 @@ class GitHubClassroomBase:
         if result.returncode != 0:
             if logger is not None:
                 logger.error(f"Command {command} failed with return code {result.returncode}")
-            raise RuntimeError(f"Command {command} failed with return code {result.returncode}") from subprocess.CalledProcessError(
+            msg = f"Command {command} failed with return code {result.returncode}"
+            raise RuntimeError(msg) from subprocess.CalledProcessError(
                 result.returncode, command, output=result.stdout, stderr=result.stderr)
         return result.stdout
 
@@ -60,7 +61,8 @@ class GitHubClassroomBase:
         except RuntimeError as e:
             if logger is not None:
                 logger.error(f"Failed to run GitHub API command: {e}")
-            raise RuntimeError("Failed to run GitHub API command.") from e
+            msg = "Failed to run GitHub API command."
+            raise RuntimeError(msg) from e
         except TypeError as e:
             logger.debug("Encountered TypeError %s", e)
             raise
