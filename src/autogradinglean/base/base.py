@@ -96,7 +96,7 @@ class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):
         if excel:
             df_query_output.to_excel(file_path, index=False)
         else:
-            df_query_output.to_csv(file_path, index=False, encoding = 'utf-8')
+            df_query_output.to_csv(file_path, index=False, encoding = "utf-8")
 
     def _initialise_logger(self, logger_name, log_file, *, debug=False):
         logger = logging.getLogger(logger_name + uuid.uuid4().hex)

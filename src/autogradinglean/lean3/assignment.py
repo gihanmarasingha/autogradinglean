@@ -62,7 +62,7 @@ class GitHubAssignmentLean3(GitHubAssignment):
                 except RuntimeError as e:
                     self.logger.error("Failed to configure the starter repository.")
                     raise RuntimeError("Failed to configure the starter repository.") from e
-                
+
                 self.logger.info("...successfully configured the starter repository.")
             else:
                 self.logger.warning("Starter repository does not exist. Please clone it first.")
