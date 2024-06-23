@@ -32,10 +32,12 @@ class GitHubAssignmentLean3(GitHubAssignment):
             if "mathlib" in leanpkgtoml["dependencies"]:
                 self.logger.info("Getting mathlib cache for stater repo...")
                 command = ["leanproject", "get-mathlib-cache"]
-                result = self._run_command(command, cwd=starter_repo_path)
 
-                if result is None:
-                    self.logger.error("Failed to get mathlib")
+                try:
+                    self._run_command(command, cwd=starter_repo_path)
+                except RuntimeError as e:
+                    self.logger.error("Failed to get mathlib %s", e)
+                    raise
                 else:
                     self.logger.info("...successfully retrieved mathlib cache")
             return
@@ -53,12 +55,15 @@ class GitHubAssignmentLean3(GitHubAssignment):
             if starter_repo_path.exists():
                 # If the starter repo directory exists, run leanpkg configure
                 command = ["leanpkg", "configure"]
-                result = self._run_command(command, cwd=starter_repo_path)
-                if result is None:
+
+                try:
+                    self._run_command(command, cwd=starter_repo_path)
+                    self._get_mathlib(starter_repo_path)
+                except RuntimeError as e:
                     self.logger.error("Failed to configure the starter repository.")
-                else:
-                    self.logger.info("...successfully configured the starter repository.")
-                self._get_mathlib(starter_repo_path)
+                    raise RuntimeError("Failed to configure the starter repository.") from e
+                
+                self.logger.info("...successfully configured the starter repository.")
             else:
                 self.logger.warning("Starter repository does not exist. Please clone it first.")
 

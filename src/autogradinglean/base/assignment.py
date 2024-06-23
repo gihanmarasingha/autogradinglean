@@ -58,9 +58,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
     def fetch_assignment_info(self):
         """Gets information about this assignment."""
         command = f"/assignments/{self.id}"
-        output = self._run_gh_api_command(command)
 
         try:
+            output = self._run_gh_api_command(command)
             assignment_data = json.loads(output)
             # self.slug = assignment_data.get("slug")
             self.accepted = assignment_data.get("accepted")  # the number of accepted submissions
@@ -72,6 +72,12 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to decode JSON: %s", e)
             self.logger.removeHandler(self.console_handler)
+            raise RuntimeError("Failed to decode JSON") from e
+        except RuntimeError as e:
+            self.logger.addHandler(self.console_handler)
+            self.logger.error("Failed to get assignment information: %s", e)
+            self.logger.removeHandler(self.console_handler)
+            raise RuntimeError("Failed to get assignment information") from e
         self.logger.info("Received assignment information")
 
     def get_starter_repo(self):
@@ -85,14 +91,15 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             # Otherwise, clone the starter repo
             command, cwd = (["gh", "repo", "clone", f"{self.starter_code_repository}", f"{starter_repo_path}"]), None
 
-        result = self._run_command(command, cwd)
-
-        if result is None:
+        try:
+            self._run_command(command, cwd)
+        except RuntimeError as e:
             self.logger.addHandler(self.console_handler)
-            self.logger.error("Failed to get starter repository.")
+            self.logger.error("Failed to get starter repository: %s", e)
             self.logger.removeHandler(self.console_handler)
-        else:
-            self.logger.info("Retrieved starter repository.")
+            raise RuntimeError("Failed to get starter repository") from e
+        
+        self.logger.info("Retrieved starter repository.")
 
     @abstractmethod
     def configure_starter_repo(self):
@@ -184,10 +191,12 @@ class GitHubAssignment(GitHubClassroomQueryBase):
         command = f"/assignments/{self.id}/accepted_assignments?page={page}&per_page={per_page}"
 
         for _ in range(3):  # Retry up to 3 times
-            output = self._run_gh_api_command(command)
+            try:
+                output = self._run_gh_api_command(command)
+            except RuntimeError:
+                time.sleep(4)  # Wait for 4 seconds before retrying
             if output is not None:
                 return output
-            time.sleep(4)  # Wait for 4 seconds before retrying
         return None  # Could not get the page after 3 attempts
 
     def _get_accepted_assignments(self):
@@ -422,6 +431,9 @@ class GitHubAssignment(GitHubClassroomQueryBase):
             self.get_student_repos()
             self.configure_student_repos()
             self.run_autograding()
+        except Exception as e:
+            self.logger.error("An error occurred during autograding: %s", e)
+            raise Exception from e
         finally:
             self.logger.removeHandler(self.console_handler)
 

@@ -37,12 +37,16 @@ class GitHubClassroomBase:
 
     @staticmethod
     def _run_command_base(command, cwd=None, logger=None):
-        """Runs the specified command as a subprocess. Returns None on error or the stdout"""
+        """Runs the specified command as a subprocess. Returns the stdout of the command if it was successful, otherwise
+        raises a CalledProcessError. If a logger is provided, the command is logged."""
         if logger is not None:
             logger.debug("Running command %s", command)
         result = subprocess.run(command, capture_output=True, text=True, shell=False, check=False, cwd=cwd)
         if result.returncode != 0:
-            return None
+            if logger is not None:
+                logger.error(f"Command {command} failed with return code {result.returncode}")
+            raise RuntimeError(f"Command {command} failed with return code {result.returncode}") from subprocess.CalledProcessError(
+                result.returncode, command, output=result.stdout, stderr=result.stderr)
         return result.stdout
 
     @staticmethod
@@ -53,9 +57,13 @@ class GitHubClassroomBase:
         try:
             raw_ouput = GitHubClassroomBase._run_command_base([*gh_api, command], logger=logger)
             return GitHubClassroomBase._ansi_escape.sub("", raw_ouput)
+        except RuntimeError as e:
+            if logger is not None:
+                logger.error(f"Failed to run GitHub API command: {e}")
+            raise RuntimeError("Failed to run GitHub API command.") from e
         except TypeError as e:
             logger.debug("Encountered TypeError %s", e)
-            return None
+            raise
 
 
 class GitHubClassroomQueryBase(ABC, GitHubClassroomBase):

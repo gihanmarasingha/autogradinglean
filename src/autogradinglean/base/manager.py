@@ -25,3 +25,4 @@ class GitHubClassroomManager(GitHubClassroomBase):
             self.classrooms = pd.DataFrame(classrooms_data)
         except json.JSONDecodeError as e:
             logging.error("Failed to decode JSON: %s", e)
+            raise

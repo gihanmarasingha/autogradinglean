@@ -21,7 +21,7 @@ class for assessing proofs written using the Lean interactive theorem prover.
 - [GitHubAssignment](#githubassignment)
 - [What is GitHub Classroom?](#what-is-github-classroom)
 - [Terminology](#terminology)
-- [Building the package](#building-the-package)
+- [Building the package](#the-hatch-build-process)
 - [Known issues and limitations](#known-issues-and-limitations)
 - [License](#license)
 

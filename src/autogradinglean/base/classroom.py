@@ -125,7 +125,13 @@ class GitHubClassroom(GitHubClassroomQueryBase):
         self.logger.info("Fetching assignments from GitHub")
         classroom_id = self.config["classroom_data"]["classroom_id"]
         command = f"/classrooms/{classroom_id}/assignments"
-        output = self._run_gh_api_command(command)
+        try:
+            output = self._run_gh_api_command(command)
+        except RuntimeError as e:
+            self.logger.addHandler(self.console_handler)
+            self.logger.error("Failed to fetch assignments: %s", e)
+            self.logger.removeHandler(self.console_handler)
+            raise
 
         try:
             assignments_data = json.loads(output)
@@ -136,7 +142,7 @@ class GitHubClassroom(GitHubClassroomQueryBase):
             self.logger.addHandler(self.console_handler)
             self.logger.error("Failed to decode JSON: %s", e)
             self.logger.removeHandler(self.console_handler)
-            return None
+            raise
 
     def _merge_student_data(self):
         """Merges candidate data from a GitHub Classroom classroom roster CSV file and a CSV file
